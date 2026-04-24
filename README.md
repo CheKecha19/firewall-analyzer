@@ -1,206 +1,218 @@
 # Firewall Analyzer v2.0 - Netopia Pro Edition
 
-Enterprise-grade firewall and ACL configuration analyzer with deep object resolution, security auditing, network topology analysis, and professional visualization.
+Enterprise-анализатор конфигураций межсетевых экранов и ACL с глубоким разрешением объектов, аудитом безопасности, анализом сетевой топологии и профессиональной визуализацией.
 
-## Features
+## Возможности
 
-### Core Capabilities
-- **Multi-vendor support**: UserGate NGFW, Cisco IOS/ASA/ACL, Juniper JunOS/SRX, Huawei VRP
-- **Deep object resolution**: Recursively expands nested groups, ranges, and lists to actual IPs/subnets
-- **Parallel processing**: ThreadPoolExecutor for concurrent file parsing
-- **Smart caching**: Caches resolved objects to avoid duplicate processing
-- **Subnet aggregation**: Collapses /32 hosts to /24 subnets for smaller graphs
+### Основные функции
+- **Поддержка множества вендоров**: UserGate NGFW, Cisco IOS/ASA/ACL, Juniper JunOS/SRX, Huawei VRP
+- **Глубокое разрешение объектов**: Рекурсивное расширение вложенных групп, диапазонов и списков до реальных IP/подсетей
+- **Параллельная обработка**: ThreadPoolExecutor для параллельного парсинга файлов
+- **Умное кэширование**: Кэширование разрешённых объектов для избежания дублирования
+- **Агрегация подсетей**: Схлопывание /32 хостов до /24 подсетей для компактных графов
 
-### Security Audit (Extended)
-- **Shadowed rule detection**: Finds rules never triggered due to broader rules above
-- **Any-any detection**: Identifies overly permissive rules with 0.0.0.0/0
-- **Insecure protocol detection**: Flags Telnet, FTP, HTTP, etc.
-- **Risk scoring**: 1-10 risk score per connection based on zones and protocols
-- **Redundant rule finder**: Detects duplicate rules
-- **Critical ports to Internet**: SSH, RDP, SNMP, Telnet exposed to 0.0.0.0/0
-- **Wide port ranges**: Flags ranges >1000 ports
-- **Bidirectional rules detection**: Identifies potentially unnecessary bidirectional access
-- **Disabled logging**: Rules without logging enabled
-- **Zone violations**: Access between incompatible security zones
+### Аудит безопасности (Расширенный)
+- **Обнаружение скрытых правил**: Поиск правил, никогда не срабатывающих из-за более широких правил выше
+- **Обнаружение any-any**: Идентификация избыточно разрешающих правил с 0.0.0.0/0
+- **Обнаружение небезопасных протоколов**: Пометка Telnet, FTP, HTTP и т.д.
+- **Оценка риска**: Баллы риска 1-10 для каждого соединения на основе зон и протоколов
+- **Поиск дублирующих правил**: Обнаружение повторяющихся правил
+- **Критические порты в Internet**: SSH, RDP, SNMP, Telnet, открытые для 0.0.0.0/0
+- **Широкие диапазоны портов**: Пометка диапазонов >1000 портов
+- **Обнаружение двунаправленных правил**: Выявление потенциально ненужного двунаправленного доступа
+- **Отключенное логирование**: Правила без включенного логирования
+- **Нарушения зон**: Доступ между несовместимыми зонами безопасности
 
-### Network Topology Analysis (Stage 2)
-- **Physical topology**: Interfaces, ports, links between devices
-- **L3 topology**: Static routes, next-hop, routing tables
-- **Device discovery**: Hostname, management IP, interfaces
-- **VLAN support**: Access/Trunk port detection, VLAN membership
+### Анализ сетевой топологии (Этап 2)
+- **Физическая топология**: Интерфейсы, порты, связи между устройствами
+- **L3 топология**: Статические маршруты, next-hop, таблицы маршрутизации
+- **Обнаружение устройств**: Hostname, IP управления, интерфейсы
+- **Поддержка VLAN**: Обнаружение Access/Trunk портов, членство в VLAN
 
-### VLAN + Security Zones (Stage 3)
-- **VLAN topology**: Broadcast domains, trunk connections
-- **VLAN matrix**: Device × VLAN membership table
-- **Security zones**: Inside/DMZ/Outside/Management
-- **Zone matrix**: Inter-zone policy compliance
-- **Auto-detection**: Zones by interface names and IP subnets
-- **Violation detection**: High-risk flows (outside→inside, etc.)
+### VLAN + Зоны безопасности (Этап 3)
+- **VLAN топология**: Broadcast domains, trunk-соединения
+- **VLAN матрица**: Таблица устройство × VLAN
+- **Зоны безопасности**: Inside/DMZ/Outside/Management
+- **Матрица зон**: Проверка межзоновых политик
+- **Авто-определение**: Зоны по именам интерфейсов и IP-подсетям
+- **Обнаружение нарушений**: Высокорисковые потоки (outside→inside и т.д.)
 
-### Configuration Comparison
-- **Diff analysis**: Compare two config versions
-- **Change tracking**: Added, Removed, Modified rules
-- **Multi-format reports**: HTML, JSON, text output
+### Сравнение конфигураций
+- **Diff-анализ**: Сравнение двух версий конфигов
+- **Отслеживание изменений**: Добавленные, удалённые, изменённые правила
+- **Многоформатные отчёты**: HTML, JSON, текстовый вывод
 
-### Compliance Auditing
-- **PCI DSS**: Checks 1.1-1.4 (default deny, inbound restriction, management access, database protection)
-- **CIS Benchmarks**: Controls 3.1-3.3
+### Комплаенс-аудит
+- **PCI DSS**: Проверки 1.1-1.4 (default deny, ограничение входящего, доступ управления, защита БД)
+- **CIS Benchmarks**: Контроли 3.1-3.3
 - **NIST**: PR.AC-3, PR.AC-5
-- **ISO 27001**: Access control requirements
-- **SOX**: Segregation of duties
+- **ISO 27001**: Требования контроля доступа
+- **SOX**: Разделение обязанностей
 
-### Visualization (Netopia Pro) — Stage 1 Complete
-- **Interactive HTML** (Vis.js): Zoom, pan, filter by zones/subnets
-- **Dual view modes**: Access Graph (firewall rules) ↔ Topology (network devices)
-- **Layout switcher**: Standard / Hierarchical / Circular layouts
-- **IP grouping**: Hierarchical by octets with nested rectangles
-- **Theme toggle**: Light/Dark mode
-- **Physics toggle**: Enable/disable node physics
-- **Risk-based coloring**: Red/orange edges for high-risk connections
-- **Path finding**: Select source/target to trace connectivity
-- **Rules panel**: Click to highlight corresponding edges
-- **PNG export**: Static visualization
-- **Full Russian localization**: All UI elements translated
+### Визуализация (Netopia Pro) — Этап 1 завершён
+- **Интерактивный HTML** (Vis.js): Масштабирование, панорама, фильтрация по зонам/подсетям
+- **Двойной режим просмотра**: Граф доступа (правила фаервола) ↔ Топология (сетевые устройства)
+- **Переключатель раскладок**: Стандартная / Иерархическая / Круговая
+- **Группировка IP**: Иерархическая по октетам с вложенными прямоугольниками
+- **Переключатель темы**: Светлая/Тёмная
+- **Переключатель физики**: Включение/отключение физики узлов
+- **Цветовое кодирование риска**: Красные/оранжевые рёбра для высокорисковых соединений
+- **Поиск пути**: Выбор источника/назначения для трассировки связности
+- **Панель правил**: Клик для подсветки соответствующих рёбер
+- **Экспорт PNG**: Статическая визуализация
+- **Полная русская локализация**: Все элементы UI переведены
 
-## Installation
+## Установка
 
 ```bash
 cd firewall-analyzer
 pip install -r requirements.txt
 ```
 
-Or auto-install on first run:
+Или автоматическая установка при первом запуске:
 ```bash
 python main.py --help
 ```
 
-## Usage
+## Использование
 
-### Basic
+### Базовый запуск
 ```bash
 python main.py /path/to/configs
 ```
 
-### Full Analysis (No Compliance)
+### Полный анализ (без комплаенса)
 ```bash
 python main.py configs --parallel --audit --risk-report --html --png --verbose --output my_report --aggregate-subnets
 ```
 
-### With Topology, VLAN and Zones
+### С топологией, VLAN и зонами
 ```bash
 python main.py configs --parallel --audit --risk-report --html --png --topology --vlan-view --zone-view --zone-matrix --verbose --output full_report
 ```
 
-### With Security Audit
+### С аудитом безопасности
 ```bash
 python main.py configs/ --audit --risk-report -v
 ```
 
-### Parallel Processing + Aggregation
+### Параллельная обработка + агрегация
 ```bash
 python main.py configs/ --parallel --aggregate-subnets --output analysis
 ```
 
-### Specific Vendor
-```bash
-python main.py configs/ --source usergate --ext .json --audit
-```
-
-### Compliance Audit
+### Комплаенс-аудит
 ```bash
 python main.py configs/ --compliance --compliance-format html
 ```
 
-### Config Diff
+### Сравнение конфигураций
 ```bash
 python main.py configs/ --diff-old old_config.txt --diff-new new_config.txt --diff-format html
 ```
 
-### Reachability Check
+### Трассировка пути (Этап 4)
 ```bash
-python main.py configs/ --reachability-check --reachability-source 192.168.1.1 --reachability-destination 10.0.0.1 --reachability-port 80
+python main.py configs --path-trace --path-source 192.168.1.100 --path-dest 10.0.0.50 --path-port 443
 ```
 
-## CLI Options
-
-```
-positional arguments:
-  input_path            Path to file or directory with configurations
-
-optional arguments:
-  -s, --source          Source type: auto (default), usergate, cisco_acl, juniper_acl
-  -e, --ext             File extensions to search
-  -r, --recursive       Recursive directory traversal (default: True)
-  --no-recursive        Disable recursive traversal
-  -o, --output          Base name for output files (default: firewall_map)
-  --output-dir          Output directory (default: output)
-  --parallel            Enable parallel parsing of multiple files
-  --aggregate-subnets   Aggregate /32 hosts to /24 subnets
-  --aggregate-threshold Minimum subnet size for aggregation (default: 24)
-  
-  # Security
-  --audit               Run security audit on rules
-  --risk-report         Generate JSON risk report
-  --compliance          Run compliance audit (PCI DSS, CIS, NIST, ISO27001)
-  --compliance-format   Output format: text, json, html (default: text)
-  
-  # Topology (Stage 2)
-  --topology            Generate physical and L3 topology view
-  --topology-format     Topology output format: html, json, png (default: html)
-  
-  # VLAN + Zones (Stage 3)
-  --vlan-view           Generate VLAN topology view
-  --zone-view           Generate security zone topology view
-  --zone-matrix         Export zone compliance matrix
-  
-  # Diff & Reachability
-  --diff-old            Old config file for comparison
-  --diff-new            New config file for comparison
-  --diff-format         Diff output format: text, json, html (default: text)
-  --reachability-check  Check reachability between IPs
-  --reachability-source Source IP for reachability check
-  --reachability-dest   Destination IP for reachability check
-  --reachability-port   Target port (default: 80)
-  --reachability-proto  Protocol: tcp, udp, icmp (default: tcp)
-  -v, --verbose         Verbose output
-  --version             Show version
-```
-
-## Examples
-
-### Enterprise Analysis
+### What-If анализ (Этап 4)
 ```bash
-# Full audit with all outputs
+python main.py configs --what-if --what-if-add "192.168.1.0/24,10.0.0.0/24,443,permit"
+```
+
+### Временная шкала (Этап 4)
+```bash
+python main.py configs --temporal-view --temporal-days 30
+```
+
+## Параметры командной строки
+
+```
+Позиционные аргументы:
+  input_path            Путь к файлу или директории с конфигурациями
+
+Опциональные аргументы:
+  -s, --source          Тип источника: auto (по умолчанию), usergate, cisco_acl, juniper_acl
+  -e, --ext             Расширения файлов для поиска
+  -r, --recursive       Рекурсивный обход директорий (по умолчанию: True)
+  --no-recursive        Отключить рекурсивный обход
+  -o, --output          Базовое имя выходных файлов (по умолчанию: firewall_map)
+  --output-dir          Директория для вывода (по умолчанию: output)
+  --parallel            Включить параллельный парсинг файлов
+  --aggregate-subnets   Агрегировать /32 хосты до /24 подсетей
+  --aggregate-threshold Минимальный размер подсети для агрегации (по умолчанию: 24)
+  
+  # Безопасность
+  --audit               Запустить аудит безопасности правил
+  --risk-report         Сгенерировать JSON-отчёт по рискам
+  --compliance          Запустить комплаенс-аудит (PCI DSS, CIS, NIST, ISO27001)
+  --compliance-format   Формат вывода: text, json, html (по умолчанию: text)
+  
+  # Топология (Этап 2)
+  --topology            Сгенерировать физическую и L3 топологию
+  --topology-format     Формат вывода топологии: html, json, png (по умолчанию: html)
+  
+  # VLAN + Зоны (Этап 3)
+  --vlan-view           Сгенерировать VLAN топологию
+  --zone-view           Сгенерировать топологию зон безопасности
+  --zone-matrix         Экспорт матрицы зон
+  
+  # Diff & Достижимость
+  --diff-old            Старый конфиг для сравнения
+  --diff-new            Новый конфиг для сравнения
+  --diff-format         Формат diff: text, json, html (по умолчанию: text)
+  --reachability-check  Проверить достижимость между IP
+  --reachability-source Источник для проверки достижимости
+  --reachability-dest   Назначение для проверки достижимости
+  --reachability-port   Целевой порт (по умолчанию: 80)
+  --reachability-proto  Протокол: tcp, udp, icmp (по умолчанию: tcp)
+  
+  # Визуализация
+  --dot                 Экспортировать в DOT (Graphviz)
+  --png                 Сгенерировать PNG карту
+  --html                Сгенерировать интерактивный HTML отчёт
+  
+  # Прочее
+  -v, --verbose         Подробный вывод
+  --version             Показать версию
+```
+
+## Примеры
+
+### Enterprise-анализ
+```bash
+# Полный аудит со всеми выходами
 python main.py configs/ --parallel --audit --risk-report --html --png -v
 ```
 
-### Quick Analysis
+### Быстрый анализ
 ```bash
-# Just HTML, no audit
+# Только HTML, без аудита
 python main.py configs/ --output quick_check --html
 ```
 
-### Security Focus
+### Фокус на безопасности
 ```bash
-# Audit only, generate risk report
+# Только аудит, генерация отчёта по рискам
 python main.py configs/ --audit --risk-report --output security_audit
 ```
 
-### Compliance Check
+### Комплаенс-проверка
 ```bash
-# PCI DSS compliance audit
+# PCI DSS комплаенс-аудит
 python main.py configs/ --compliance --compliance-format html --output pci_audit
 ```
 
-### Config Migration
+### Миграция конфигурации
 ```bash
-# Compare old and new configs
+# Сравнение старого и нового конфига
 python main.py configs/ --diff-old config_v1.txt --diff-new config_v2.txt --diff-format html --output migration_report
 ```
 
-### Troubleshooting Connectivity
+### Диагностика связности
 ```bash
-# Check if 192.168.1.100 can reach 10.0.0.50 on port 443
+# Проверка может ли 192.168.1.100 достичь 10.0.0.50 на порту 443
 python main.py configs/ --reachability-check \
   --reachability-source 192.168.1.100 \
   --reachability-destination 10.0.0.50 \
@@ -208,101 +220,107 @@ python main.py configs/ --reachability-check \
   --reachability-proto tcp
 ```
 
-## HTML Visualization Controls
+## Управление HTML визуализацией
 
-The interactive HTML report includes:
+Интерактивный HTML отчёт включает:
 
-| Control | Description |
-|---------|-------------|
-| **View Mode** | Switch between Access Graph (rules) and Topology (devices) |
-| **Layout** | Standard, Hierarchical, or Circular arrangement |
-| **Search Node** | Find and focus specific nodes |
-| **Filter by Zone** | Show only specific security zones |
-| **Filter by Subnet** | Filter by network segments |
-| **Find Path** | Trace connectivity between two IPs |
-| **Risk Toggle** | Show only high-risk connections |
-| **Hierarchical IP** | Group IPs by octets with nested rectangles |
-| **Physics Toggle** | Enable/disable node physics simulation |
-| **Dark Theme** | Toggle light/dark color scheme |
+| Элемент | Описание |
+|---------|----------|
+| **Режим просмотра** | Переключение между Графом доступа (правила) и Топологией (устройства) |
+| **Раскладка** | Стандартная, Иерархическая или Круговая расстановка |
+| **Поиск узла** | Поиск и фокусировка на конкретных узлах |
+| **Фильтр по зоне** | Показать только определённые зоны безопасности |
+| **Фильтр по подсети** | Фильтрация по сетевым сегментам |
+| **Поиск пути** | Трассировка связности между двумя IP |
+| **Риск** | Показать только высокорисковые соединения |
+| **Иерархический IP** | Группировка IP по октетам с вложенными прямоугольниками |
+| **Физика** | Включение/отключение симуляции физики узлов |
+| **Тёмная тема** | Переключение светлой/тёмной цветовой схемы |
 
-## Security Audit Features
+## Функции аудита безопасности
 
-| Check | Severity | Description |
-|-------|----------|-------------|
-| Shadowed rules | Medium | Rules never triggered due to broader rules above |
-| Any-any rules | Critical | Rules allowing traffic from any to any |
-| Insecure protocols | Medium | Telnet, FTP, HTTP instead of SSH/SFTP/HTTPS |
-| Zone violations | High | Access from untrusted to critical zones |
-| Redundant rules | Low | Duplicate rules wasting resources |
-| Critical ports exposed | Critical | SSH/RDP/SNMP/Telnet to Internet |
-| Wide port ranges | Medium | Ranges spanning >1000 ports |
-| Bidirectional rules | Low | Potentially unnecessary bidirectional access |
-| Disabled logging | Medium | Rules without audit logging |
+| Проверка | Серьёзность | Описание |
+|----------|-------------|----------|
+| any_any_rule | Критическая | Правило разрешает трафик из any в any |
+| any_source_rule | Высокая | Правило разрешает трафик из любого источника |
+| any_destination_rule | Высокая | Правило разрешает трафик в любое назначение |
+| shadowed_rule | Средняя | Правило перекрывается предыдущим, более широким правилом |
+| insecure_protocol | Средняя | Использование небезопасных протоколов (Telnet, FTP) |
+| wide_port_range | Средняя | Диапазон портов > 1000 |
+| critical_to_internet | Высокая | SSH/RDP/SNMP открыты для 0.0.0.0/0 |
+| disabled_logging | Низкая | Правило без логирования |
+| zone_violation | Высокая | Доступ между несовместимыми зонами |
 
-## Risk Scoring
-
-Risk score (1-10) based on:
-- Source zone criticality (Internet=1, Trusted=4, Management=5)
-- Destination zone criticality
-- Protocol security (insecure protocols +3 points)
-- Service criticality (SSH, RDP, databases +2 points)
-- Port exposure (critical ports to Internet +5 points)
-
-## Architecture
+## Архитектура
 
 ```
 firewall-analyzer/
-├── main.py                        # Entry point with parallel processing
-├── requirements.txt
+├── main.py                 # Точка входа, CLI
 ├── src/
-│   ├── cli.py                     # CLI with all flags
-│   ├── models/                    # Data models
-│   │   ├── endpoint.py
-│   │   ├── service.py
-│   │   ├── rule.py
-│   │   ├── interface.py
-│   │   ├── route.py
-│   │   ├── device.py
-│   │   └── vlan.py                # VLAN models
-│   ├── parsers/
-│   │   ├── json_parser.py         # UserGate with ObjectResolver
-│   │   ├── acl_parser.py          # Cisco/Juniper/Huawei + topology parsing
-│   │   └── base_parser.py         # Base class with topology methods
+│   ├── cli.py             # Парсер аргументов командной строки
 │   ├── core/
-│   │   ├── analyzer.py            # Parallel processing, caching, topology integration
-│   │   ├── resolver.py            # Deep object resolution
-│   │   ├── security_auditor.py    # Security analysis
-│   │   ├── topology_builder.py    # Network topology builder
-│   │   ├── reachability_checker.py # Path tracing with ACL evaluation
-│   │   ├── config_diff.py         # Config comparison
-│   │   └── compliance_auditor.py  # PCI DSS, CIS, NIST compliance
-│   └── graph/
-│       └── visualizer.py          # Professional HTML/PNG with Netopia Pro features
+│   │   ├── analyzer.py     # Основной анализатор (парсинг + граф)
+│   │   ├── security_auditor.py  # Аудит безопасности
+│   │   ├── compliance_auditor.py # Комплаенс-проверки
+│   │   ├── config_diff.py  # Сравнение конфигураций
+│   │   ├── reachability_checker.py # Проверка достижимости
+│   │   ├── topology_builder.py     # Строитель топологии
+│   │   ├── vlan_topology.py        # VLAN топология (Этап 3)
+│   │   ├── zone_topology.py        # Зоны безопасности (Этап 3)
+│   │   ├── path_tracer.py          # Трассировка пути (Этап 4)
+│   │   ├── what_if.py              # What-If анализ (Этап 4)
+│   │   └── temporal_view.py        # Временная шкала (Этап 4)
+│   ├── parsers/
+│   │   ├── base_parser.py  # Базовый класс парсера
+│   │   ├── json_parser.py  # Парсер UserGate JSON
+│   │   ├── acl_parser.py   # Парсер Cisco/Huawei ACL
+│   │   └── topology_parser.py # Парсер топологии (Этап 2)
+│   ├── graph/
+│   │   └── visualizer.py   # HTML/PNG визуализация
+│   ├── models/
+│   │   ├── rule.py          # Модель правила
+│   │   ├── endpoint.py      # Модель endpoint
+│   │   ├── service.py       # Модель сервиса
+│   │   ├── device.py        # Модель устройства
+│   │   ├── interface.py     # Модель интерфейса
+│   │   ├── vlan.py          # Модель VLAN
+│   │   └── route.py         # Модель маршрута
+│   └── integrations/
+│       ├── rest_api.py      # REST API сервер
+│       ├── cicd.py          # CI/CD интеграция
+│       └── siem_export.py   # SIEM экспорт
+├── configs/                 # Входные конфигурации
+└── output/                  # Выходные файлы
 ```
 
-## Supported Configurations
+## Разработка
 
-| Vendor | File Types | Topology | ACLs | Routes | VLANs |
-|--------|------------|----------|------|--------|-------|
-| UserGate NGFW | .json | ✅ | ✅ | ❌ | ❌ |
-| Cisco IOS/ASA | .txt | ✅ | ✅ | ✅ | ✅ |
-| Juniper JunOS | .txt | ✅ | ✅ | ✅ | ✅ |
-| Huawei VRP | .txt | ✅ | ✅ | ✅ | ✅ |
-| HP/Aruba | .txt | ✅ | ✅ | ❌ | ❌ |
+### Этапы реализации
 
-## Security
+| Этап | Статус | Описание |
+|------|--------|----------|
+| 1 | ✅ Готово | Fix & Polish — русская локализация, JS фиксы |
+| 2 | ✅ Готово | Physical + L3 Topology — интерфейсы, маршруты |
+| 3 | ✅ Готово | VLAN + Security Zones — VLAN граф, зоны безопасности |
+| 4 | ✅ Готово | Advanced Analytics — Path Tracer, What-If, Temporal |
+| 5 | ⏸ Отключено | Integrations — REST API, CI/CD, SIEM |
 
-- ✅ 100% local execution
-- ✅ No external API calls
-- ✅ Open source dependencies only
-- ✅ No cloud uploads
-- ✅ No telemetry
+### Зависимости
 
-## Version History
+- Python 3.10+
+- networkx — построение графов
+- pandas — обработка данных
+- pyvis — визуализация графов
+- Pillow — генерация PNG
 
-- **v2.0 - Netopia Pro**: Topology analysis, reachability checking, compliance audit, config diff, dual-view visualization, VLAN support, hierarchical IP grouping
-- **v1.0**: Basic parsing, security audit, simple visualization
+```bash
+pip install -r requirements.txt
+```
 
-## License
+## Лицензия
 
-MIT License - Open source
+MIT License. См. LICENSE для деталей.
+
+## Авторы
+
+Разработано для enterprise-сетей с поддержкой multi-vendor конфигураций.
