@@ -1,0 +1,8 @@
+# Обязательные зависимости
+networkx>=2.8
+pandas>=1.5
+pyvis>=0.3.2
+
+# Опциональные (для PNG)
+pygraphviz>=1.11
+matplotlib>=3.5
