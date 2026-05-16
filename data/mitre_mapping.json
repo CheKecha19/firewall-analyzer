@@ -1,0 +1,125 @@
+{
+  "mappings": [
+    {
+      "finding_pattern": "any-any rule",
+      "technique_id": "T1190",
+      "technique_name": "Exploit Public-Facing Application",
+      "tactic": "Initial Access",
+      "description": "Any-to-any rules expose the network to unrestricted external access"
+    },
+    {
+      "finding_pattern": "telnet allowed",
+      "technique_id": "T1021.004",
+      "technique_name": "Remote Services: SSH",
+      "tactic": "Lateral Movement",
+      "description": "Telnet is an unencrypted remote access protocol"
+    },
+    {
+      "finding_pattern": "ftp allowed",
+      "technique_id": "T1071.002",
+      "technique_name": "File Transfer Protocols",
+      "tactic": "Command and Control",
+      "description": "FTP can be used for data exfiltration and C2"
+    },
+    {
+      "finding_pattern": "rdp exposed",
+      "technique_id": "T1021.001",
+      "technique_name": "Remote Desktop Protocol",
+      "tactic": "Lateral Movement",
+      "description": "RDP exposed to untrusted zones enables lateral movement"
+    },
+    {
+      "finding_pattern": "smb exposed",
+      "technique_id": "T1021.002",
+      "technique_name": "SMB/Windows Admin Shares",
+      "tactic": "Lateral Movement",
+      "description": "SMB exposed to untrusted zones enables lateral movement and ransomware spread"
+    },
+    {
+      "finding_pattern": "ssh exposed",
+      "technique_id": "T1021.004",
+      "technique_name": "Remote Services: SSH",
+      "tactic": "Lateral Movement",
+      "description": "SSH exposed to untrusted zones enables lateral movement"
+    },
+    {
+      "finding_pattern": "http allowed",
+      "technique_id": "T1071.001",
+      "technique_name": "Web Protocols",
+      "tactic": "Command and Control",
+      "description": "Plain HTTP can be used for C2 communication"
+    },
+    {
+      "finding_pattern": "database exposed",
+      "technique_id": "T1190",
+      "technique_name": "Exploit Public-Facing Application",
+      "tactic": "Initial Access",
+      "description": "Database ports exposed externally enable direct data access attacks"
+    },
+    {
+      "finding_pattern": "dns allowed",
+      "technique_id": "T1071.004",
+      "technique_name": "DNS",
+      "tactic": "Command and Control",
+      "description": "DNS can be abused for tunneling and C2"
+    },
+    {
+      "finding_pattern": "snmp exposed",
+      "technique_id": "T1602.001",
+      "technique_name": "Data from Configuration Repository: SNMP",
+      "tactic": "Collection",
+      "description": "SNMP exposed enables network reconnaissance"
+    },
+    {
+      "finding_pattern": "source=any",
+      "technique_id": "T1190",
+      "technique_name": "Exploit Public-Facing Application",
+      "tactic": "Initial Access",
+      "description": "Rules with source=any allow access from arbitrary external hosts"
+    },
+    {
+      "finding_pattern": "insecure protocol",
+      "technique_id": "T1040",
+      "technique_name": "Network Sniffing",
+      "tactic": "Credential Access",
+      "description": "Insecure protocols transmit data in cleartext"
+    },
+    {
+      "finding_pattern": "wide port range",
+      "technique_id": "T1048",
+      "technique_name": "Exfiltration Over Alternative Protocol",
+      "tactic": "Exfiltration",
+      "description": "Rules with wide port ranges enable data exfiltration over arbitrary ports"
+    },
+    {
+      "finding_pattern": "management exposed",
+      "technique_id": "T1078",
+      "technique_name": "Valid Accounts",
+      "tactic": "Defense Evasion",
+      "description": "Management interfaces exposed externally enable credential-based attacks"
+    },
+    {
+      "finding_pattern": "high_to_low_zone",
+      "technique_id": "T1543.003",
+      "technique_name": "Create or Modify System Process: Windows Service",
+      "tactic": "Persistence",
+      "description": "Access from high-security to low-security zones may establish persistence"
+    }
+  ],
+  "tactics": [
+    "Reconnaissance",
+    "Resource Development",
+    "Initial Access",
+    "Execution",
+    "Persistence",
+    "Privilege Escalation",
+    "Defense Evasion",
+    "Credential Access",
+    "Discovery",
+    "Lateral Movement",
+    "Collection",
+    "Command and Control",
+    "Exfiltration",
+    "Impact"
+  ]
+}

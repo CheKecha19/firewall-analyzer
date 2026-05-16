@@ -48,9 +48,10 @@ class WhatIfResult:
 class WhatIfAnalyzer:
     """Анализатор What-If сценариев."""
     
-    def __init__(self, rules: List, topology=None):
+    def __init__(self, rules: List, topology=None, topology_builder=None):
         self.original_rules = rules
         self.topology = topology
+        self.topology_builder = topology_builder
         self.original_risk = self._calculate_overall_risk(rules)
     
     def simulate(self, changes: List[RuleChange]) -> WhatIfResult:

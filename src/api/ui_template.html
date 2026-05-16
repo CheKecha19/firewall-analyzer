@@ -1,0 +1,2309 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Firewall Analyzer WEB UI</title>
+<style>
+:root {
+  --bg: #1a1a2e;
+  --bg2: #16213e;
+  --bg3: #0f3460;
+  --text: #e0e0e0;
+  --text2: #a0a0a0;
+  --accent: #e94560;
+  --primary: #0f3460;
+  --border: #2a2a4a;
+  --header-bg: #0f0f23;
+  --tab-bg: #16213e;
+  --tab-active: #0f3460;
+  --input-bg: #1a1a2e;
+  --card-bg: #16213e;
+  --node-default: #90EE90;
+  --hover-bg: #1f2f4f;
+  --panel-bg: rgba(22,33,62,0.95);
+  --brand-primary: #e94560;
+  --brand-accent: #0f3460;
+  --logo-url: '';
+  --title-text: 'Firewall Analyzer';
+}
+body.light {
+  --bg: #f0f2f5;
+  --bg2: #ffffff;
+  --bg3: #e4e6eb;
+  --text: #1a1a2e;
+  --text2: #606770;
+  --accent: #e94560;
+  --primary: #1877f2;
+  --border: #ccd0d5;
+  --header-bg: #ffffff;
+  --tab-bg: #f0f2f5;
+  --tab-active: #ffffff;
+  --input-bg: #f0f2f5;
+  --card-bg: #ffffff;
+  --node-default: #34c759;
+  --hover-bg: #e4e6eb;
+  --panel-bg: rgba(255,255,255,0.97);
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  transition: background 0.3s, color 0.3s;
+  overflow: hidden;
+  height: 100vh;
+}
+header {
+  background: var(--header-bg);
+  border-bottom: 1px solid var(--border);
+  padding: 8px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 48px;
+  z-index: 10;
+  position: relative;
+}
+.header-left { display: flex; align-items: center; gap: 12px; }
+.header-left .logo {
+  width: 28px; height: 28px; border-radius: 6px; object-fit: contain;
+  background: var(--accent);
+  display: var(--logo-src, none);
+}
+.header-left h1 { font-size: 16px; font-weight: 600; }
+.header-stats { display: flex; gap: 16px; font-size: 12px; }
+.header-stats span { color: var(--text2); }
+.header-stats b { color: var(--text); }
+.header-right { display: flex; gap: 8px; align-items: center; }
+#theme-btn {
+  background: var(--bg3); border: 1px solid var(--border); color: var(--text);
+  width: 32px; height: 32px; border-radius: 6px; cursor: pointer; font-size: 16px;
+  transition: background 0.3s;
+}
+#theme-btn:hover { background: var(--hover-bg); }
+
+.toolbar {
+  background: var(--bg2);
+  border-bottom: 1px solid var(--border);
+  padding: 6px 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  min-height: 38px;
+}
+.toolbar button, .toolbar .btn {
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 4px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 13px;
+  transition: background 0.2s;
+  white-space: nowrap;
+}
+.toolbar button:hover, .toolbar .btn:hover { background: var(--hover-bg); }
+.toolbar button.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+.toolbar .sep { width: 1px; height: 24px; background: var(--border); margin: 0 4px; }
+.toolbar select {
+  background: var(--input-bg); border: 1px solid var(--border);
+  color: var(--text); padding: 4px 8px; border-radius: 4px; font-size: 13px;
+}
+.toolbar input {
+  background: var(--input-bg); border: 1px solid var(--border);
+  color: var(--text); padding: 4px 8px; border-radius: 4px; font-size: 13px;
+  width: 100px;
+}
+
+#container {
+  display: flex;
+  height: calc(100vh - 124px);
+  position: relative;
+}
+#mynetwork {
+  flex: 1;
+  background: var(--bg);
+  position: relative;
+}
+#network-canvas { width: 100%; height: 100%; }
+#minimap {
+  position: absolute;
+  bottom: 10px;
+  right: 320px;
+  width: 200px;
+  height: 140px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg2);
+  z-index: 5;
+  cursor: pointer;
+  display: none;
+}
+.sidebar {
+  width: 310px;
+  background: var(--panel-bg);
+  border-left: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  backdrop-filter: blur(8px);
+}
+.tab-nav {
+  display: flex;
+  border-bottom: 1px solid var(--border);
+}
+.tab-nav button {
+  flex: 1;
+  background: var(--tab-bg);
+  border: none;
+  color: var(--text2);
+  padding: 8px;
+  cursor: pointer;
+  font-size: 12px;
+  border-bottom: 2px solid transparent;
+  transition: all 0.2s;
+}
+.tab-nav button.active {
+  color: var(--accent);
+  background: var(--tab-active);
+  border-bottom-color: var(--accent);
+}
+.tab-content { flex: 1; overflow-y: auto; padding: 8px; display: none; }
+.tab-content.active { display: block; }
+.tab-content .item {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px 10px;
+  margin-bottom: 6px;
+  font-size: 13px;
+}
+.tab-content .item .label { color: var(--text2); font-size: 11px; }
+.tab-content .item .value { font-weight: 500; margin-top: 2px; }
+.issue-card { background: var(--card-bg); border-radius: 6px; padding: 8px; margin-bottom: 6px; border-left: 3px solid #555; font-size: 12px; }
+.issue-card.critical { border-left-color: #ff4444; }
+.issue-card.high { border-left-color: #ff8800; }
+.issue-card.medium { border-left-color: #ffcc00; }
+.issue-card.low { border-left-color: #44aaff; }
+.issue-card .severity { font-weight: 600; font-size: 11px; margin-bottom: 3px; }
+.issue-card .desc { margin-bottom: 2px; }
+.issue-card .rec { color: var(--text2); font-style: italic; font-size: 11px; }
+.badge {
+  display: inline-block; padding: 2px 6px; border-radius: 3px;
+  font-size: 10px; font-weight: 600;
+}
+.badge-red { background: #e94560; color: #fff; }
+.badge-orange { background: #f59e0b; color: #000; }
+.badge-green { background: #10b981; color: #fff; }
+.badge-blue { background: #3b82f6; color: #fff; }
+.search-box {
+  position: relative;
+  margin-bottom: 8px;
+}
+.search-box input {
+  width: 100%;
+  background: var(--input-bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 6px 10px;
+  border-radius: 4px;
+  font-size: 13px;
+}
+.search-results { max-height: 300px; overflow-y: auto; }
+.search-results .result {
+  padding: 6px 8px; border-radius: 4px; cursor: pointer;
+  border-bottom: 1px solid var(--border);
+}
+.search-results .result:hover { background: var(--hover-bg); }
+
+path-panel {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 310px;
+  background: var(--panel-bg);
+  border-top: 1px solid var(--border);
+  padding: 8px 12px;
+  display: none;
+  z-index: 6;
+  backdrop-filter: blur(8px);
+  max-height: 140px;
+  overflow-y: auto;
+}
+path-panel .hop {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  margin: 2px 4px;
+  font-size: 12px;
+  transition: all 0.3s;
+}
+path-panel .hop.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+path-panel .hop-arrow { color: var(--text2); font-size: 14px; margin: 0 2px; }
+
+/* MITRE Matrix */
+.mitre-matrix { width: 100%; border-collapse: collapse; font-size: 10px; }
+.mitre-matrix th { background: var(--header-bg); color: var(--text2); padding: 4px 6px; text-align: left; font-weight: 500; position: sticky; top: 0; z-index: 1; }
+.mitre-matrix td { padding: 3px 6px; border-bottom: 1px solid var(--border); vertical-align: top; }
+.mitre-matrix .tech-badge { display: inline-block; padding: 2px 5px; margin: 1px; border-radius: 3px; cursor: pointer; font-size: 9px; font-weight: 600; transition: all 0.15s; }
+.mitre-matrix .tech-badge:hover { filter: brightness(1.3); }
+.mitre-matrix .tech-badge.critical { background: #ff4444; color: #fff; }
+.mitre-matrix .tech-badge.high { background: #ff8800; color: #fff; }
+.mitre-matrix .tech-badge.medium { background: #ffcc00; color: #1a1a2e; }
+.mitre-matrix .tech-badge.low { background: #44aaff; color: #fff; }
+.mitre-summary { display: flex; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; font-size: 11px; color: var(--text2); }
+.mitre-summary span { padding: 2px 6px; background: var(--card-bg); border-radius: 3px; }
+
+/* Attack Graph */
+.attack-external { background: #e94560 !important; color: #fff !important; }
+.attack-critical { background: #f59e0b !important; color: #000 !important; }
+.attack-hop { background: var(--bg3); color: var(--text); padding: 4px 8px; border-radius: 4px; margin: 2px 4px; display: inline-block; font-size: 12px; border: 1px solid var(--border); }
+.attack-hop.external { border-left: 3px solid #e94560; }
+.attack-hop.critical { border-left: 3px solid #f59e0b; }
+.attack-hop.arrow { color: var(--accent); font-weight: bold; margin: 0 2px; }
+.attack-path-card {
+  background: var(--card-bg); border: 1px solid var(--border);
+  border-radius: 6px; padding: 8px 10px; margin-bottom: 6px;
+  border-left: 3px solid var(--accent); font-size: 12px;
+}
+.attack-path-card .path-header { font-weight: 600; margin-bottom: 4px; }
+.attack-path-card .path-hops { display: flex; flex-wrap: wrap; align-items: center; gap: 2px; margin-top: 4px; }
+.attack-path-card .risk-badge {
+  display: inline-block; padding: 2px 6px; border-radius: 3px;
+  font-size: 10px; font-weight: 600; margin-left: 6px;
+}
+
+/* Quality Cards */
+.quality-header {
+  display: flex; align-items: center; gap: 8px;
+  margin-bottom: 10px; padding: 8px; background: var(--card-bg);
+  border-radius: 6px; border: 1px solid var(--border);
+}
+.quality-score {
+  font-size: 28px; font-weight: 700; width: 56px; height: 56px;
+  border-radius: 50%; display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.quality-score.good { background: #10b981; color: #fff; }
+.quality-score.warn { background: #f59e0b; color: #000; }
+.quality-score.bad { background: #e94560; color: #fff; }
+.quality-summary { font-size: 11px; color: var(--text2); }
+.quality-card {
+  background: var(--card-bg); border-radius: 6px; padding: 8px;
+  margin-bottom: 6px; border-left: 3px solid #555; font-size: 12px;
+}
+.quality-card.shadowed { border-left-color: #f59e0b; }
+.quality-card.conflict { border-left-color: #e94560; }
+.quality-card.redundant { border-left-color: #3b82f6; }
+.quality-card.unused { border-left-color: #6b7280; }
+.quality-card .ql-badge {
+  display: inline-block; padding: 1px 5px; border-radius: 3px;
+  font-size: 10px; font-weight: 600; margin-right: 4px;
+}
+.ql-badge.shadowed { background: #f59e0b; color: #000; }
+.ql-badge.conflict { background: #e94560; color: #fff; }
+.ql-badge.redundant { background: #3b82f6; color: #fff; }
+.ql-badge.unused { background: #6b7280; color: #fff; }
+
+/* Dashboard KPI Cards */
+#dashboard-content { padding: 8px; }
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.kpi-card {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px;
+  text-align: center;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+.kpi-card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.2); }
+.kpi-card .kpi-icon { font-size: 24px; margin-bottom: 4px; }
+.kpi-card .kpi-value { font-size: 28px; font-weight: 700; color: var(--accent); }
+.kpi-card .kpi-label { font-size: 11px; color: var(--text2); margin-top: 4px; }
+.kpi-card .kpi-trend { font-size: 12px; margin-top: 4px; }
+.kpi-trend.up { color: #10b981; }
+.kpi-trend.down { color: #e94560; }
+.kpi-trend.flat { color: var(--text2); }
+
+.chart-container {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px;
+  margin-bottom: 10px;
+}
+.chart-container h4 { font-size: 13px; margin-bottom: 8px; color: var(--text2); }
+.chart-container canvas { max-height: 200px; }
+
+.top-list { margin-bottom: 10px; }
+.top-list .top-item {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 8px;
+  margin-bottom: 4px;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.top-item .rank { font-weight: 700; color: var(--accent); min-width: 20px; }
+.top-item .detail { flex: 1; }
+.top-item .meta { color: var(--text2); font-size: 10px; }
+
+/* Topology summary cards */
+.topo-summary {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin: 8px 0;
+  font-size: 11px;
+}
+.topo-summary .ts-chip {
+  padding: 3px 8px;
+  border-radius: 12px;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+}
+
+#context-menu {
+  position: absolute;
+  background: var(--panel-bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 4px 0;
+  min-width: 160px;
+  z-index: 20;
+  display: none;
+  backdrop-filter: blur(8px);
+}
+#context-menu .menu-item {
+  padding: 6px 12px;
+  cursor: pointer;
+  font-size: 13px;
+  transition: background 0.2s;
+}
+#context-menu .menu-item:hover { background: var(--hover-bg); }
+#context-menu .menu-sep { height: 1px; background: var(--border); margin: 4px 0; }
+
+#loading {
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 18px;
+  color: var(--text2);
+  z-index: 30;
+}
+
+/* 3D container */
+#graph3d {
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  display: none;
+  z-index: 2;
+}
+/* Optimization preview */
+.opt-summary {
+  display: flex; gap: 8px; margin-bottom: 10px; flex-wrap: wrap;
+}
+.opt-summary .opt-kpi {
+  flex: 1; min-width: 80px; background: var(--card-bg);
+  border: 1px solid var(--border); border-radius: 8px;
+  padding: 10px; text-align: center;
+}
+.opt-kpi .kpi-val { font-size: 22px; font-weight: 700; color: var(--accent); }
+.opt-kpi .kpi-lbl { font-size: 10px; color: var(--text2); margin-top: 2px; }
+.opt-kpi.savings { border-color: #10b981; }
+.opt-kpi.savings .kpi-val { color: #10b981; }
+.opt-kpi.complexity { border-color: #3b82f6; }
+.opt-kpi.complexity .kpi-val { color: #3b82f6; }
+
+.opt-compare {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
+  margin-bottom: 10px;
+}
+.opt-compare .opt-col {
+  background: var(--card-bg); border: 1px solid var(--border);
+  border-radius: 8px; padding: 8px; font-size: 12px;
+}
+.opt-col.before { border-left: 3px solid #f59e0b; }
+.opt-col.after { border-left: 3px solid #10b981; }
+.opt-col h4 { margin-bottom: 6px; font-size: 13px; }
+.opt-col .opt-rule {
+  padding: 4px 6px; margin: 2px 0; border-radius: 4px;
+  background: var(--bg); font-size: 11px;
+  display: flex; align-items: center; gap: 4px;
+}
+.opt-rule .opt-name { font-weight: 600; flex: 1; }
+.opt-rule .opt-action {
+  padding: 1px 5px; border-radius: 3px; font-size: 9px; font-weight: 600;
+}
+.opt-action.permit, .opt-action.accept, .opt-action.allow {
+  background: #10b981; color: #fff;
+}
+.opt-action.deny, .opt-action.drop, .opt-action.reject {
+  background: #e94560; color: #fff;
+}
+
+.opt-grouping {
+  background: var(--card-bg); border: 1px solid var(--border);
+  border-radius: 6px; padding: 8px; margin-bottom: 6px; font-size: 12px;
+  border-left: 3px solid #8b5cf6;
+}
+.opt-grouping .group-header {
+  font-weight: 600; margin-bottom: 4px; color: #8b5cf6;
+}
+.opt-grouping .group-rules {
+  font-size: 11px; color: var(--text2);
+}
+
+/* Impact Analysis */
+.impact-card {
+  background: var(--card-bg); border: 1px solid var(--border);
+  border-radius: 8px; padding: 10px; margin-bottom: 8px;
+}
+.impact-card .impact-header {
+  display: flex; align-items: center; gap: 8px; margin-bottom: 8px;
+}
+.impact-card .impact-severity {
+  padding: 4px 10px; border-radius: 12px; font-size: 12px; font-weight: 600; color: #fff;
+}
+.impact-card .impact-severity.critical { background: #e94560; }
+.impact-card .impact-severity.high { background: #f59e0b; }
+.impact-card .impact-severity.medium { background: #3b82f6; }
+.impact-card .impact-severity.low { background: #10b981; }
+
+.impact-entities { max-height: 300px; overflow-y: auto; }
+.impact-entity {
+  padding: 4px 8px; margin: 3px 0; border-radius: 4px;
+  font-size: 11px; display: flex; align-items: center; gap: 6px;
+  background: var(--bg);
+}
+.impact-entity .ie-sev {
+  width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+}
+.impact-entity .ie-type {
+  font-size: 9px; padding: 1px 4px; border-radius: 3px;
+  background: var(--bg3); color: var(--text2);
+}
+.impact-entity .ie-label { flex: 1; font-weight: 500; }
+.impact-entity .ie-reason { font-size: 9px; color: var(--text2); font-style: italic; }
+
+/* Export button */
+.opt-export-btn {
+  background: var(--accent); color: #fff; border: none;
+  padding: 6px 14px; border-radius: 6px; cursor: pointer;
+  font-size: 12px; margin-top: 8px;
+}
+.opt-export-btn:hover { filter: brightness(1.2); }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-left">
+    <div class="logo" id="brand-logo"></div>
+    <h1 id="brand-title"></h1>
+  </div>
+  <div class="header-stats" id="header-stats">
+    <span>Nodes: <b id="stat-nodes">0</b></span>
+    <span>Edges: <b id="stat-edges">0</b></span>
+    <span>Rules: <b id="stat-rules">0</b></span>
+    <span>Issues: <b id="stat-issues">0</b></span>
+  </div>
+  <div class="header-right">
+    <button id="theme-btn" onclick="toggleTheme()">🌙</button>
+  </div>
+</header>
+
+<div class="toolbar">
+  <button data-mode="standard" class="active" onclick="setMode('standard')">⚡ Стандарт</button>
+  <button data-mode="hierarchy" onclick="setMode('hierarchy')">📊 Иерархия</button>
+  <button data-mode="circle" onclick="setMode('circle')">🔄 Круг</button>
+  <button data-mode="risk" onclick="setMode('risk')">🔥 Риск</button>
+  <button data-mode="attack" onclick="setMode('attack')">⚔️ Attack</button>
+  <span class="sep"></span>
+  <button id="btn-3d" onclick="toggle3D()">🌐 3D</button>
+  <span class="sep"></span>
+  <button onclick="exportPNG()">📷 PNG</button>
+  <button onclick="exportJSON()">📄 JSON</button>
+  <button onclick="siemExport()">🛡️ SIEM</button>
+  <span class="sep"></span>
+  <select id="zone-filter" onchange="applyZoneFilter()">
+    <option value="">Все зоны</option>
+    __ZONES_OPTIONS__
+  </select>
+  <span class="sep"></span>
+  <div style="display:flex;gap:4px;align-items:center;" id="trace-block">
+    <input id="trace-src" placeholder="Source" style="width:85px;">
+    <input id="trace-dst" placeholder="Dest" style="width:85px;">
+    <button onclick="tracePath()">🔍 Trace</button>
+    <button onclick="clearPath()" style="font-size:11px;">✕</button>
+  </div>
+</div>
+
+<div class="toolbar" id="topo-toolbar" style="border-top:none;">
+  <button data-topo="data-flow" onclick="showTopology('data-flow')">📊 Data Flow</button>
+  <button data-topo="trust-boundary" onclick="showTopology('trust-boundary')">🔒 Trust</button>
+  <button data-topo="resilience" onclick="showTopology('resilience')">🔄 Resilience</button>
+  <button data-topo="encryption" onclick="showTopology('encryption')">🔐 Encryption</button>
+  <button data-topo="lateral-movement" onclick="showTopology('lateral-movement')">↔️ Lateral</button>
+  <button data-topo="microseg" onclick="showTopology('microseg')">🔬 Micro-seg</button>
+  <button data-topo="vrf" onclick="showTopology('vrf')">🏢 VRF</button>
+</div>
+
+<div id="container">
+  <div id="mynetwork">
+    <canvas id="network-canvas"></canvas>
+    <div id="minimap"><canvas id="minimap-canvas" width="200" height="140"></canvas></div>
+    <div id="graph3d"></div>
+    <div id="loading">Loading...</div>
+    <div id="context-menu"></div>
+  </div>
+  <div class="sidebar" id="sidebar">
+    <div class="tab-nav">
+      <button class="active" data-tab="tab-dashboard">📈 Дашборд</button>
+      <button data-tab="tab-rules">📋 Правила</button>
+      <button data-tab="tab-audit">🔍 Аудит</button>
+      <button data-tab="tab-search">🔎 Поиск</button>
+      <button data-tab="tab-info">ℹ️ Инфо</button>
+      <button data-tab="tab-mitre">🛡️ MITRE</button>
+      <button data-tab="tab-quality">⚙️ Качество</button>
+      <button data-tab="tab-optimizer">🔧 Оптимизация</button>
+    </div>
+    <div class="tab-content active" id="tab-dashboard">
+      <div id="dashboard-content" style="font-size:12px;color:var(--text2);">Загрузка дашборда...</div>
+    </div>
+    <div class="tab-content" id="tab-rules"></div>
+    <div class="tab-content" id="tab-audit"></div>
+    <div class="tab-content" id="tab-mitre">
+      <div id="mitre-content" style="font-size:12px;color:var(--text2)">Загрузка...</div>
+    </div>
+    <div class="tab-content" id="tab-quality">
+      <div id="quality-content" style="font-size:12px;color:var(--text2)">Загрузка...</div>
+    </div>
+    <div class="tab-content" id="tab-optimizer">
+      <div id="optimizer-content" style="font-size:12px;color:var(--text2)">
+        <div style="text-align:center;padding:20px;">
+          <button onclick="renderOptimizer()" style="background:var(--accent);color:#fff;border:none;padding:10px 20px;border-radius:6px;cursor:pointer;font-size:14px;">
+            🔍 Анализировать оптимизацию
+          </button>
+          <div class="label" style="margin-top:8px;">Нажмите для загрузки предпросмотра оптимизации правил</div>
+        </div>
+      </div>
+    </div>
+    <div class="tab-content" id="tab-search">
+      <div class="search-box">
+        <input id="search-input" placeholder="Поиск узлов..." onkeyup="doSearch()">
+      </div>
+      <div class="search-results" id="search-results"></div>
+    </div>
+    <div class="tab-content" id="tab-info">
+      <div id="info-content" class="item">
+        <div class="label">Выберите узел на графе</div>
+      </div>
+    </div>
+  </div>
+  <path-panel id="path-panel"></path-panel>
+</div>
+
+<script>
+// ─── DATA ────────────────────────────────────────────
+var allNodes = __NODES_JSON__;
+var allEdges = __EDGES_JSON__;
+var allRules = __RULES_JSON__;
+var allAudit = __AUDIT_JSON__;
+var statsData = __STATS_JSON__;
+
+// ─── STATE ───────────────────────────────────────────
+var currentMode = 'standard';
+var is3D = false;
+var selectedNodes = [];
+var selectedEdges = [];
+var network = null;
+var pathData = [];
+
+// ─── INIT ────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', function() {
+  applyBranding();
+  applyTheme();
+  updateStats();
+  renderSidebar();
+  initTabNav();
+  initNetwork();
+  initContextMenu();
+  loadModeFromHash();
+});
+
+function applyBranding() {
+  var title = document.getElementById('brand-title');
+  var logo = document.getElementById('brand-logo');
+  title.textContent = getComputedStyle(document.documentElement).getPropertyValue('--title-text').replace(/'/g,'').trim() || 'Firewall Analyzer';
+  var logoUrl = getComputedStyle(document.documentElement).getPropertyValue('--logo-url').replace(/url\(|\)/g,'').replace(/'/g,'').trim();
+  if (logoUrl) {
+    logo.style.display = 'block';
+    logo.style.backgroundImage = 'url(' + logoUrl + ')';
+    logo.style.backgroundSize = 'contain';
+    logo.style.backgroundPosition = 'center';
+    logo.style.backgroundRepeat = 'no-repeat';
+  }
+}
+
+function updateStats() {
+  document.getElementById('stat-nodes').textContent = statsData.nodes || 0;
+  document.getElementById('stat-edges').textContent = statsData.edges || 0;
+  document.getElementById('stat-rules').textContent = statsData.rules || 0;
+  document.getElementById('stat-issues').textContent = statsData.issues || 0;
+}
+
+// ─── THEME ───────────────────────────────────────────
+function toggleTheme() {
+  var body = document.body;
+  body.classList.toggle('light');
+  localStorage.setItem('fa-theme', body.classList.contains('light') ? 'light' : 'dark');
+  document.getElementById('theme-btn').textContent = body.classList.contains('light') ? '☀️' : '🌙';
+  if (network) { updateNetworkColors(); }
+  renderMinimap();
+}
+
+function applyTheme() {
+  var saved = localStorage.getItem('fa-theme');
+  if (saved === 'light') {
+    document.body.classList.add('light');
+    document.getElementById('theme-btn').textContent = '☀️';
+  }
+}
+
+function updateNetworkColors() {
+  var isLight = document.body.classList.contains('light');
+  var bgColor = isLight ? '#f0f2f5' : '#1a1a2e';
+  var fontColor = isLight ? '#1a1a2e' : '#e0e0e0';
+  var edgeColor = isLight ? '#999' : '#666';
+  if (network) {
+    network.setOptions({
+      nodes: { font: { color: fontColor } },
+      edges: { color: { color: edgeColor } }
+    });
+    var cvs = document.getElementById('network-canvas').parentElement;
+    if (cvs) cvs.style.background = bgColor;
+  }
+}
+
+// ─── NETWORK (Vis.js) ───────────────────────────────
+function initNetwork() {
+  var container = document.getElementById('mynetwork');
+  var isLight = document.body.classList.contains('light');
+  var bgColor = isLight ? '#f0f2f5' : '#1a1a2e';
+  var fontColor = isLight ? '#1a1a2e' : '#e0e0e0';
+  var edgeColor = isLight ? '#999' : '#666';
+
+  var nodesVis = allNodes.map(function(n) {
+    return {
+      id: n.id,
+      label: n.label || n.id,
+      group: n.group || 'Unknown',
+      color: n.color || '#90EE90',
+      size: n.size || 25,
+      title: n.title || n.id,
+      type: n.type || 'unknown'
+    };
+  });
+
+  var edgesVis = allEdges.map(function(e) {
+    return {
+      from: e.from,
+      to: e.to,
+      color: e.color || '#666',
+      width: e.width || 1,
+      title: e.title || '',
+      risk: e.risk || 0
+    };
+  });
+
+  var options = {
+    nodes: {
+      shape: 'dot',
+      font: { color: fontColor, size: 14 },
+      borderWidth: 1,
+      borderWidthSelected: 3,
+      chosen: { node: function(values) { values.borderColor = '#e94560'; values.shadow = true; } }
+    },
+    edges: {
+      smooth: { type: 'continuous' },
+      arrows: { to: { enabled: true, scaleFactor: 0.5 } },
+      color: { color: edgeColor, highlight: '#e94560', hover: '#e94560' },
+      width: 1,
+      chosen: { edge: function(values) { values.color = '#e94560'; values.width = 3; } }
+    },
+    physics: {
+      stabilization: { iterations: 200 },
+      barnesHut: { gravitationalConstant: -2000, springLength: 150 }
+    },
+    interaction: {
+      multiselect: true,
+      navigationButtons: false,
+      keyboard: { enabled: true, bindToWindow: false }
+    },
+    layout: { improvedLayout: true },
+    groups: {}
+  };
+
+  var dataSet = { nodes: new vis.DataSet(nodesVis), edges: new vis.DataSet(edgesVis) };
+  network = new vis.Network(container, dataSet, options);
+
+  network.on('click', function(params) {
+    if (params.nodes.length === 1) {
+      showNodeInfo(params.nodes[0]);
+    }
+    if (params.nodes.length === 0 && params.edges.length === 0) {
+      document.getElementById('info-content').innerHTML = '<div class="label">Выберите узел на графе</div>';
+    }
+    updateSelection();
+  });
+
+  network.on('doubleClick', function(params) {
+    if (params.nodes.length > 0) {
+      network.focus(params.nodes[0], { scale: 1.5, animation: { duration: 400, easingFunction: 'easeInOutQuad' } });
+    }
+  });
+
+  network.on('stabilized', function() {
+    document.getElementById('loading').style.display = 'none';
+    renderMinimap();
+  });
+
+  network.on('dragEnd', function() { renderMinimap(); });
+  network.on('zoom', function() { renderMinimap(); });
+
+  setTimeout(function() { document.getElementById('loading').style.display = 'none'; renderMinimap(); }, 3000);
+
+  window.addEventListener('hashchange', loadModeFromHash);
+  renderMinimap();
+}
+
+// ─── MODES ───────────────────────────────────────────
+function setMode(mode) {
+  currentMode = mode;
+  document.querySelectorAll('.toolbar button[data-mode]').forEach(function(b) {
+    b.classList.toggle('active', b.dataset.mode === mode);
+  });
+  updateHash();
+  if (!network) return;
+
+  var physics;
+  var layout;
+  switch (mode) {
+    case 'standard':
+      physics = { solver: 'forceAtlas2Based', forceAtlas2Based: { gravitationalConstant: -50, springLength: 100 } };
+      layout = { hierarchical: false };
+      break;
+    case 'hierarchy':
+      physics = { solver: 'hierarchicalRepulsion' };
+      layout = { hierarchical: { enabled: true, direction: 'LR', sortMethod: 'directed', nodeSpacing: 150 } };
+      break;
+    case 'circle':
+      physics = { solver: 'barnesHut', barnesHut: { gravitationalConstant: -8000, springLength: 250, centralGravity: 5 } };
+      layout = { hierarchical: false };
+      break;
+    case 'risk':
+      physics = { solver: 'barnesHut', barnesHut: { gravitationalConstant: -2000, springLength: 100 + allEdges.reduce(function(s,e){return s+(e.risk||0);},0)/Math.max(1,allEdges.length) } };
+      layout = { hierarchical: false };
+      break;
+    case 'attack':
+      renderAttackGraph();
+      return;
+  }
+  network.setOptions({ physics: physics, layout: layout });
+  renderMinimap();
+}
+
+function updateHash() {
+  var zf = document.getElementById('zone-filter').value;
+  var hash = 'mode=' + currentMode;
+  if (zf) hash += '&zone=' + encodeURIComponent(zf);
+  window.location.hash = hash;
+}
+
+function loadModeFromHash() {
+  var hash = window.location.hash.replace('#','');
+  var params = new URLSearchParams(hash);
+  var mode = params.get('mode');
+  if (mode && ['standard','hierarchy','circle','risk','attack'].indexOf(mode) >= 0) {
+    setMode(mode);
+  }
+  var zone = params.get('zone');
+  if (zone) {
+    document.getElementById('zone-filter').value = zone;
+    applyZoneFilter();
+  }
+}
+
+// ─── ZONE FILTER ─────────────────────────────────────
+function applyZoneFilter() {
+  var zone = document.getElementById('zone-filter').value;
+  updateHash();
+  if (!network) return;
+  if (!zone) {
+    allNodes.forEach(function(n) { network.body.data.nodes.update({id:n.id, hidden:false}); });
+    allEdges.forEach(function(e) { network.body.data.edges.update({id:e.id, hidden:false}); });
+    return;
+  }
+  var visibleNodes = {};
+  allNodes.forEach(function(n) {
+    var visible = n.group === zone;
+    network.body.data.nodes.update({id:n.id, hidden:!visible});
+    if (visible) visibleNodes[n.id] = true;
+  });
+  allEdges.forEach(function(e) {
+    network.body.data.edges.update({id:e.id, hidden:!(visibleNodes[e.from] && visibleNodes[e.to])});
+  });
+  renderMinimap();
+}
+
+// ─── SELECTION ───────────────────────────────────────
+function updateSelection() {
+  if (!network) return;
+  var sel = network.getSelection();
+  selectedNodes = sel.nodes;
+  selectedEdges = sel.edges;
+}
+
+// ─── EXPORT ──────────────────────────────────────────
+function exportPNG() {
+  if (!network) return;
+  var cvs = document.getElementById('network-canvas');
+  var ctx = cvs.getContext('2d');
+  var dataUrl = network.canvas.frame.canvas.toDataURL('image/png');
+  var a = document.createElement('a');
+  a.href = dataUrl;
+  a.download = 'firewall-graph.png';
+  a.click();
+}
+
+function exportJSON() {
+  var data = { nodes: allNodes, edges: allEdges, rules: allRules, audit: allAudit, stats: statsData };
+  var blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'firewall-export.json';
+  a.click();
+}
+
+function siemExport() {
+  var od = prompt('Output directory:', 'output');
+  if (!od) return;
+  fetch('/api/siem/export', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ output_dir: od, base_name: 'siem_export' })
+  }).then(function(r) { return r.json(); })
+    .then(function(d) { alert('SIEM экспорт завершен: ' + JSON.stringify(d.formats)); })
+    .catch(function(e) { alert('Ошибка: ' + e); });
+}
+
+// ─── 3D GRAPH ────────────────────────────────────────
+function toggle3D() {
+  is3D = !is3D;
+  var btn3d = document.getElementById('btn-3d');
+  var nd = document.getElementById('mynetwork');
+  var g3d = document.getElementById('graph3d');
+  if (is3D) {
+    btn3d.textContent = '📊 2D';
+    btn3d.classList.add('active');
+    nd.style.display = 'none';
+    g3d.style.display = 'block';
+    document.getElementById('minimap').style.display = 'none';
+    init3DGraph();
+  } else {
+    btn3d.textContent = '🌐 3D';
+    btn3d.classList.remove('active');
+    nd.style.display = 'block';
+    g3d.style.display = 'none';
+    document.getElementById('minimap').style.display = currentMode === 'standard' ? 'block' : 'none';
+    if (network) { network.redraw(); renderMinimap(); }
+  }
+}
+
+function init3DGraph() {
+  var el = document.getElementById('graph3d');
+  el.innerHTML = '';
+
+  var gData = { nodes: [], links: [] };
+  var maxRisk = 0;
+  allNodes.forEach(function(n) {
+    var risk = (n.risk !== undefined ? n.risk : 5);
+    maxRisk = Math.max(maxRisk, risk);
+    gData.nodes.push({
+      id: n.id,
+      label: n.label || n.id,
+      risk: risk,
+      group: n.group || 'Unknown',
+      color: risk > 7 ? '#e94560' : risk > 4 ? '#f59e0b' : '#10b981'
+    });
+  });
+  allEdges.forEach(function(e) {
+    gData.links.push({
+      source: e.from,
+      target: e.to,
+      risk: e.risk || 0,
+      color: (e.risk||0) > 7 ? '#e94560' : (e.risk||0) > 4 ? '#f59e0b' : '#666'
+    });
+  });
+
+  var Graph = ForceGraph3D();
+  Graph(el)
+    .graphData(gData)
+    .nodeLabel('label')
+    .nodeColor('color')
+    .nodeVal(function(n) { return 1 + (n.risk || 1); })
+    .nodeThreeObject(function(n) {
+      var sprite = new THREE.Sprite(new THREE.SpriteMaterial({
+        map: createLabelTexture(n.label || n.id),
+        depthTest: false, depthWrite: false
+      }));
+      sprite.scale.set(4, 1.5, 1);
+      sprite.position.y = 1.5;
+      return sprite;
+    })
+    .linkColor('color')
+    .linkWidth(function(l) { return 0.5 + (l.risk || 0) * 0.3; })
+    .linkDirectionalParticles(1)
+    .linkDirectionalParticleWidth(1.5)
+    .onNodeClick(function(n) {
+      showNodeInfo(n.id);
+    });
+}
+
+function createLabelTexture(text) {
+  var canvas = document.createElement('canvas');
+  canvas.width = 256; canvas.height = 64;
+  var ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#fff';
+  ctx.font = '24px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText((text||'').substring(0, 20), 128, 32);
+  return new THREE.CanvasTexture(canvas);
+}
+
+// ─── MINIMAP ─────────────────────────────────────────
+function renderMinimap() {
+  if (is3D || currentMode !== 'standard' || !network) {
+    document.getElementById('minimap').style.display = 'none';
+    return;
+  }
+  document.getElementById('minimap').style.display = 'block';
+  var mmCanvas = document.getElementById('minimap-canvas');
+  var ctx = mmCanvas.getContext('2d');
+  var w = 200, h = 140;
+  ctx.clearRect(0, 0, w, h);
+
+  var isLight = document.body.classList.contains('light');
+  ctx.fillStyle = isLight ? '#ffffff' : '#16213e';
+  ctx.fillRect(0, 0, w, h);
+
+  var positions = network.getPositions(allNodes.map(function(n) { return n.id; }));
+  if (!positions || Object.keys(positions).length === 0) return;
+
+  var xs = [], ys = [];
+  for (var id in positions) { xs.push(positions[id].x); ys.push(positions[id].y); }
+  var minX = Math.min.apply(null, xs), maxX = Math.max.apply(null, xs);
+  var minY = Math.min.apply(null, ys), maxY = Math.max.apply(null, ys);
+  var rangeX = maxX - minX || 1, rangeY = maxY - minY || 1;
+  var pad = 10;
+  var scaleX = (w - 2*pad) / rangeX;
+  var scaleY = (h - 2*pad) / rangeY;
+
+  // draw edges
+  ctx.strokeStyle = isLight ? '#ccd0d5' : '#3a3a5a';
+  ctx.lineWidth = 0.5;
+  allEdges.forEach(function(e) {
+    var fp = positions[e.from], tp = positions[e.to];
+    if (!fp || !tp) return;
+    ctx.beginPath();
+    ctx.moveTo(pad + (fp.x - minX) * scaleX, pad + (fp.y - minY) * scaleY);
+    ctx.lineTo(pad + (tp.x - minX) * scaleX, pad + (tp.y - minY) * scaleY);
+    ctx.stroke();
+  });
+
+  // draw nodes
+  allNodes.forEach(function(n) {
+    var p = positions[n.id];
+    if (!p) return;
+    ctx.fillStyle = n.color || '#90EE90';
+    ctx.beginPath();
+    ctx.arc(pad + (p.x - minX) * scaleX, pad + (p.y - minY) * scaleY, 2.5, 0, 2*Math.PI);
+    ctx.fill();
+  });
+
+  // draw viewport rectangle
+  var vp = network.getViewPosition();
+  var vpScale = network.getScale();
+  var vpW = w / vpScale, vpH = h / vpScale;
+  var vpLeft = -vp.x / vpScale, vpTop = -vp.y / vpScale;
+  ctx.strokeStyle = '#e94560';
+  ctx.lineWidth = 1.5;
+  ctx.strokeRect(
+    pad + (vpLeft - minX) * scaleX,
+    pad + (vpTop - minY) * scaleY,
+    vpW * scaleX,
+    vpH * scaleY
+  );
+
+  // minimap drag handler
+  mmCanvas.onmousedown = function(e) {
+    var rect = mmCanvas.getBoundingClientRect();
+    var mx = e.clientX - rect.left;
+    var my = e.clientY - rect.top;
+    var worldX = minX + (mx - pad) / scaleX;
+    var worldY = minY + (my - pad) / scaleY;
+    network.moveTo({ position: { x: -worldX * vpScale + vpW * vpScale / 2, y: -worldY * vpScale + vpH * vpScale / 2 } });
+    renderMinimap();
+  };
+}
+
+// ─── PATH TRACE ──────────────────────────────────────
+function tracePath() {
+  var src = document.getElementById('trace-src').value.trim();
+  var dst = document.getElementById('trace-dst').value.trim();
+  if (!src || !dst) return alert('Введите Source и Destination');
+  if (!network) return;
+
+  var edgeMap = {};
+  allEdges.forEach(function(e) {
+    if (!edgeMap[e.from]) edgeMap[e.from] = [];
+    edgeMap[e.from].push(e.to);
+    if (!edgeMap[e.to]) edgeMap[e.to] = [];
+    edgeMap[e.to].push(e.from);
+  });
+
+  var visited = {}, queue = [[src]];
+  visited[src] = true;
+  var foundPath = null;
+  while (queue.length > 0) {
+    var path = queue.shift();
+    var node = path[path.length - 1];
+    if (node === dst) { foundPath = path; break; }
+    var neighbors = edgeMap[node] || [];
+    for (var i = 0; i < neighbors.length; i++) {
+      if (!visited[neighbors[i]]) {
+        visited[neighbors[i]] = true;
+        var newPath = path.concat([neighbors[i]]);
+        queue.push(newPath);
+      }
+    }
+  }
+
+  if (!foundPath) return alert('Путь не найден между ' + src + ' и ' + dst);
+
+  pathData = foundPath;
+  var panel = document.getElementById('path-panel');
+  panel.style.display = 'block';
+  panel.innerHTML = '<strong>Path: </strong>';
+
+  foundPath.forEach(function(hop, i) {
+    var span = document.createElement('span');
+    span.className = 'hop';
+    span.textContent = hop;
+    span.id = 'hop-' + i;
+    panel.appendChild(span);
+    if (i < foundPath.length - 1) {
+      var arrow = document.createElement('span');
+      arrow.className = 'hop-arrow';
+      arrow.textContent = '→';
+      panel.appendChild(arrow);
+    }
+  });
+
+  animatePath(0);
+}
+
+function animatePath(idx) {
+  if (idx >= pathData.length) return;
+  document.querySelectorAll('#path-panel .hop').forEach(function(h) { h.classList.remove('active'); });
+  var hopEl = document.getElementById('hop-' + idx);
+  if (hopEl) hopEl.classList.add('active');
+
+  var nodesToShow = pathData.slice(0, idx + 1);
+  if (network) {
+    network.selectNodes(nodesToShow, false);
+    if (idx > 0) {
+      network.focus(pathData[idx], { scale: 1.2, animation: { duration: 300, easingFunction: 'easeInOutQuad' } });
+    }
+    renderMinimap();
+  }
+
+  setTimeout(function() { animatePath(idx + 1); }, 400);
+}
+
+function clearPath() {
+  pathData = [];
+  document.getElementById('path-panel').style.display = 'none';
+  document.getElementById('trace-src').value = '';
+  document.getElementById('trace-dst').value = '';
+  if (network) network.selectNodes([], false);
+}
+
+// ─── CONTEXT MENU ────────────────────────────────────
+function initContextMenu() {
+  var cm = document.getElementById('context-menu');
+  if (!network) return;
+
+  // Build menu items
+  cm.innerHTML = `
+    <div class="menu-item" onclick="cmAction('focus')">🔍 Сфокусировать</div>
+    <div class="menu-item" onclick="cmAction('info')">ℹ️ Информация</div>
+    <div class="menu-item" onclick="cmAction('neighbors')">🔗 Соседи</div>
+    <div class="menu-item" onclick="cmAction('impact')">💥 Impact Analysis</div>
+    <div class="menu-sep"></div>
+    <div class="menu-item" onclick="cmAction('isolate')">🔬 Изолировать</div>
+    <div class="menu-item" onclick="cmAction('reset')">🔄 Показать всё</div>
+  `;
+
+  var container = document.getElementById('mynetwork');
+  container.addEventListener('contextmenu', function(e) {
+    e.preventDefault();
+    var canvasPos = network.DOMtoCanvas({ x: e.clientX - container.getBoundingClientRect().left, y: e.clientY - container.getBoundingClientRect().top });
+    var nodeId = network.getNodeAt(canvasPos);
+    if (!nodeId) { cm.style.display = 'none'; return; }
+    cm.style.display = 'block';
+    cm.style.left = e.clientX + 'px';
+    cm.style.top = e.clientY + 'px';
+    cm.dataset.nodeId = nodeId;
+  });
+
+  document.addEventListener('click', function(e) {
+    if (!e.target.closest('#context-menu')) cm.style.display = 'none';
+  });
+}
+
+function cmAction(action) {
+  var cm = document.getElementById('context-menu');
+  var nodeId = cm.dataset.nodeId;
+  cm.style.display = 'none';
+  if (!network || !nodeId) return;
+  switch (action) {
+    case 'focus':
+      network.focus(nodeId, { scale: 1.5, animation: { duration: 400, easingFunction: 'easeInOutQuad' } });
+      break;
+    case 'info':
+      showNodeInfo(nodeId);
+      document.querySelector('.tab-nav button[data-tab="tab-info"]').click();
+      break;
+    case 'neighbors':
+      var connected = network.getConnectedNodes(nodeId);
+      network.selectNodes(connected.concat([nodeId]), false);
+      break;
+    case 'isolate':
+      var allIds = allNodes.map(function(n) { return n.id; });
+      var connected = network.getConnectedNodes(nodeId);
+      connected.push(nodeId);
+      allIds.forEach(function(id) {
+        if (connected.indexOf(id) < 0) network.body.data.nodes.update({id:id, hidden:true});
+        else network.body.data.nodes.update({id:id, hidden:false});
+      });
+      allEdges.forEach(function(e) {
+        network.body.data.edges.update({id:e.id, hidden:!(connected.indexOf(e.from)>=0 && connected.indexOf(e.to)>=0)});
+      });
+      network.fit({ animation:true });
+      break;
+    case 'reset':
+      allNodes.forEach(function(n) { network.body.data.nodes.update({id:n.id, hidden:false}); });
+      allEdges.forEach(function(e) { network.body.data.edges.update({id:e.id, hidden:false}); });
+      network.fit({ animation:true });
+      break;
+    case 'impact':
+      analyzeImpact(nodeId);
+      break;
+  }
+}
+
+// ─── SIDEBAR ─────────────────────────────────────────
+function initTabNav() {
+  document.querySelectorAll('.tab-nav button').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      document.querySelectorAll('.tab-nav button').forEach(function(b) { b.classList.remove('active'); });
+      btn.classList.add('active');
+      document.querySelectorAll('.tab-content').forEach(function(tc) { tc.classList.remove('active'); });
+      var tab = document.getElementById(btn.dataset.tab);
+      if (tab) tab.classList.add('active');
+      // Trigger render for quality tab
+      if (btn.dataset.tab === 'tab-quality') {
+        renderQuality();
+      }
+      // Trigger render for optimizer tab
+      if (btn.dataset.tab === 'tab-optimizer') {
+        renderOptimizer();
+      }
+    });
+  });
+}
+
+function renderSidebar() {
+  renderRules();
+  renderAudit();
+  renderMitre();
+  renderQuality();
+}
+
+function renderRules() {
+  var container = document.getElementById('tab-rules');
+  if (!allRules.length) {
+    container.innerHTML = '<div class="item"><div class="label">Нет правил</div></div>';
+    return;
+  }
+  var html = '';
+  allRules.forEach(function(r) {
+    html += '<div class="item">';
+    html += '<div class="value">' + escapeHtml(r.name || 'Unknown') + '</div>';
+    html += '<div class="label">From: ' + escapeHtml(r.sources || '-') + ' → To: ' + escapeHtml(r.destinations || '-') + '</div>';
+    html += '<div style="margin-top:4px;">';
+    html += '<span class="badge badge-blue">' + escapeHtml(r.action || 'permit') + '</span> ';
+    html += '<span class="badge" style="background:var(--bg3);">' + escapeHtml(r.services || '-') + '</span>';
+    html += '</div>';
+    html += '</div>';
+  });
+  container.innerHTML = html;
+}
+
+function renderAudit() {
+  var container = document.getElementById('tab-audit');
+  if (!allAudit.length) {
+    container.innerHTML = '<div class="item"><div class="label">Аудит чист — проблем не найдено</div></div>';
+    return;
+  }
+  var severities = { critical: 'badge-red', high: 'badge-orange', medium: 'badge-blue', low: 'badge-green' };
+  var html = '';
+  allAudit.forEach(function(i) {
+    var sevClass = severities[i.severity] || 'badge-blue';
+    html += '<div class="item">';
+    html += '<span class="badge ' + sevClass + '">' + escapeHtml(i.severity || 'info') + '</span> ';
+    html += '<span class="badge" style="background:var(--bg3);">' + escapeHtml(i.type || 'unknown') + '</span>';
+    html += '<div class="value" style="margin-top:4px;">' + escapeHtml(i.description || '') + '</div>';
+    if (i.recommendation) html += '<div class="label">💡 ' + escapeHtml(i.recommendation) + '</div>';
+    html += '</div>';
+  });
+  container.innerHTML = html;
+}
+
+function renderMitre() {
+  var container = document.getElementById('tab-mitre');
+  fetch('/api/mitre/matrix')
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (!data.matrix || Object.keys(data.matrix).length === 0) {
+        container.innerHTML = '<div class="item"><div class="label">Нет MITRE-матчей — findings отсутствуют или не подходят под известные техники</div></div>';
+        return;
+      }
+      var html = '<div class="mitre-summary">';
+      html += '<span>Tactics: ' + (data.tactics_covered ? data.tactics_covered.length : 0) + '</span>';
+      html += '<span>Techniques: ' + (data.techniques_used ? data.techniques_used.length : 0) + '</span>';
+      html += '<span>Matches: ' + data.total_matches + '/' + (data.total_findings || 0) + '</span>';
+      html += '</div>';
+      html += '<table class="mitre-matrix"><thead><tr><th>Tactic</th><th>Techniques</th></tr></thead><tbody>';
+      var tactics = Object.keys(data.matrix).sort();
+      for (var i = 0; i < tactics.length; i++) {
+        var tactic = tactics[i];
+        var techniques = data.matrix[tactic];
+        html += '<tr><td style="font-weight:600">' + escapeHtml(tactic) + '</td><td>';
+        var techIds = Object.keys(techniques).sort();
+        for (var j = 0; j < techIds.length; j++) {
+          var techId = techIds[j];
+          var count = techniques[techId];
+          // Find severity of first match for this technique
+          var sev = 'medium';
+          if (data.matches) {
+            for (var k = 0; k < data.matches.length; k++) {
+              if (data.matches[k].technique_id === techId) {
+                sev = data.matches[k].severity || 'medium';
+                break;
+              }
+            }
+          }
+          html += '<span class="tech-badge ' + sev + '" title="' + escapeHtml(techId) + ': ' + count + ' finding(s)" onclick="filterMitreTechnique(\'' + techId + '\')">' + escapeHtml(techId) + ' (' + count + ')</span> ';
+        }
+        html += '</td></tr>';
+      }
+      html += '</tbody></table>';
+      container.innerHTML = html;
+    })
+    .catch(function() {
+      container.innerHTML = '<div class="item"><div class="label">Ошибка загрузки MITRE данных</div></div>';
+    });
+}
+
+function filterMitreTechnique(techId) {
+  fetch('/api/mitre?technique=' + encodeURIComponent(techId))
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      // Show findings in a popup-like container
+      var container = document.getElementById('tab-info');
+      var html = '<h3 style="color:var(--accent);margin-bottom:8px">Technique: ' + escapeHtml(techId) + '</h3>';
+      if (!data.matches || !data.matches.length) {
+        html += '<div class="item"><div class="label">Нет findings</div></div>';
+      } else {
+        html += '<div style="font-size:11px;color:var(--text2);margin-bottom:4px">' + data.total_matches + ' finding(s)</div>';
+        for (var i = 0; i < data.matches.length; i++) {
+          var m = data.matches[i];
+          html += '<div class="issue-card ' + (m.severity || 'low') + '">';
+          html += '<div class="severity">' + escapeHtml(m.severity || '?') + ' | ' + escapeHtml(m.technique_name || techId) + '</div>';
+          html += '<div class="desc">' + escapeHtml(m.finding_type || '?') + '</div>';
+          html += '<div class="rec">Tactic: ' + escapeHtml(m.tactic || '?') + ' | Confidence: ' + escapeHtml(m.confidence || '?') + '</div>';
+          html += '</div>';
+        }
+      }
+      container.innerHTML = html;
+      // Switch to info tab
+      document.querySelectorAll('.tab-nav button').forEach(function(b) { b.classList.remove('active'); });
+      document.querySelector('[data-tab="tab-info"]').classList.add('active');
+      document.querySelectorAll('.tab-content').forEach(function(tc) { tc.classList.remove('active'); });
+      document.getElementById('tab-info').classList.add('active');
+    });
+}
+
+// ─── ATTACK GRAPH ────────────────────────────────────
+function renderAttackGraph() {
+  document.getElementById('minimap').style.display = 'none';
+  var sidebar = document.getElementById('sidebar');
+  // Show info tab with attack data
+  var container = document.getElementById('tab-info');
+  container.innerHTML = '<div class="search-box" style="text-align:center;padding:20px;">Загрузка графа атак...</div>';
+  document.querySelectorAll('.tab-nav button').forEach(function(b) { b.classList.remove('active'); });
+  document.querySelector('[data-tab="tab-info"]').classList.add('active');
+  document.querySelectorAll('.tab-content').forEach(function(tc) { tc.classList.remove('active'); });
+  document.getElementById('tab-info').classList.add('active');
+
+  fetch('/api/attack-graph')
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (!network) return;
+
+      // Highlight nodes: external-red, critical-gold
+      var updatedNodes = [];
+      var extSet = {};
+      var critSet = {};
+      (data.external_sources || []).forEach(function(n) { extSet[n] = true; });
+      (data.critical_targets || []).forEach(function(n) { critSet[n] = true; });
+
+      allNodes.forEach(function(n) {
+        var nodeData = { id: n.id };
+        if (extSet[n.id]) {
+          nodeData.color = { background: '#e94560', border: '#ff6666' };
+          nodeData.size = 35;
+          nodeData.borderWidth = 3;
+        } else if (critSet[n.id]) {
+          nodeData.color = { background: '#f59e0b', border: '#ffcc00' };
+          nodeData.size = 30;
+          nodeData.borderWidth = 3;
+        } else {
+          nodeData.color = { background: n.color || '#D3D3D3' };
+          nodeData.size = 20;
+        }
+        updatedNodes.push(nodeData);
+      });
+      network.body.data.nodes.update(updatedNodes);
+
+      // Highlight attack path edges
+      var pathEdges = {};
+      (data.attack_paths || []).forEach(function(p) {
+        var hops = p.hops || [];
+        for (var i = 1; i < hops.length; i++) {
+          var key = hops[i-1].node + '->' + hops[i].node;
+          pathEdges[key] = (pathEdges[key] || 0) + 1;
+        }
+      });
+      var updatedEdges = [];
+      allEdges.forEach(function(e) {
+        var key = e.from + '->' + e.to;
+        var edgeData = { id: e.id };
+        if (pathEdges[key]) {
+          edgeData.color = '#e94560';
+          edgeData.width = Math.min(6, 2 + pathEdges[key]);
+        } else {
+          edgeData.color = { color: '#444', opacity: 0.2 };
+          edgeData.width = 0.5;
+        }
+        updatedEdges.push(edgeData);
+      });
+      network.body.data.edges.update(updatedEdges);
+
+      // Show stats
+      document.getElementById('stat-nodes').textContent = data.external_sources ? data.external_sources.length : 0;
+      document.getElementById('stat-edges').textContent = data.attack_paths ? data.attack_paths.length : 0;
+      document.getElementById('stat-issues').textContent = data.reachable_targets || 0;
+
+      // Render path list in info tab
+      var html = '<div style="font-size:12px;">';
+      html += '<div class="item" style="text-align:center;">';
+      html += '<span class="badge badge-red" style="font-size:12px;padding:3px 8px;">⚔️ ' + (data.attack_paths ? data.attack_paths.length : 0) + ' Путей атак</span> ';
+      html += '<span class="badge badge-orange" style="font-size:12px;padding:3px 8px;">🎯 ' + (data.reachable_targets || 0) + '/' + (data.targets_count || 0) + ' Достигнуто</span>';
+      html += '</div>';
+
+      if (!data.attack_paths || !data.attack_paths.length) {
+        html += '<div class="item"><div class="label" style="text-align:center;">Атакующие пути не обнаружены ✓</div></div>';
+      } else {
+        var pathsToShow = data.attack_paths.slice(0, 20);
+        for (var i = 0; i < pathsToShow.length; i++) {
+          var p = pathsToShow[i];
+          var riskColor = p.riskscore >= 7 ? '#e94560' : p.riskscore >= 4 ? '#f59e0b' : '#10b981';
+          html += '<div class="attack-path-card" onclick="focusAttackPath(\'' + p.source + '\', \'' + p.target + '\')" style="cursor:pointer;">';
+          html += '<div class="path-header">';
+          html += '<span style="background:' + riskColor + ';color:#fff;padding:1px 5px;border-radius:3px;font-size:10px;">R' + (p.riskscore || 0) + '</span> ';
+          html += escapeHtml(p.source || '?') + ' → ' + escapeHtml(p.target || '?');
+          html += '<span style="color:var(--text2);font-size:10px;margin-left:6px;">(' + (p.hop_count || '?') + ' hops)</span>';
+          html += '</div>';
+          html += '<div class="path-hops">';
+          var hops = p.hops || [];
+          for (var j = 0; j < hops.length; j++) {
+            var h = hops[j];
+            var hopClass = 'attack-hop';
+            if (extSet[h.node]) hopClass += ' external';
+            else if (critSet[h.node]) hopClass += ' critical';
+            html += '<span class="' + hopClass + '">' + escapeHtml(h.node) + '</span>';
+            if (j < hops.length - 1) {
+              html += '<span class="attack-hop arrow">→</span>';
+            }
+          }
+          html += '</div>';
+          html += '</div>';
+        }
+      }
+      html += '</div>';
+      container.innerHTML = html;
+
+      if (data.attack_paths && data.attack_paths.length > 0 && data.attack_paths[0].source) {
+        var firstSrc = data.attack_paths[0].source;
+        network.focus(firstSrc, { scale: 1.0, animation: true });
+      }
+    })
+    .catch(function() {
+      document.getElementById('tab-info').innerHTML = '<div class="item"><div class="label">Ошибка загрузки графа атак</div></div>';
+    });
+}
+
+function focusAttackPath(src, dst) {
+  if (!network) return;
+  fetch('/api/attack-graph')
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      var pathNodes = [src];
+      var paths = data.attack_paths || [];
+      for (var i = 0; i < paths.length; i++) {
+        if (paths[i].source === src && paths[i].target === dst) {
+          var hops = paths[i].hops || [];
+          for (var j = 1; j < hops.length; j++) {
+            pathNodes.push(hops[j].node);
+          }
+          break;
+        }
+      }
+      if (pathNodes.length > 0) {
+        network.selectNodes(pathNodes, false);
+        network.fit({ nodes: pathNodes, animation: { duration: 400, easingFunction: 'easeInOutQuad' } });
+      }
+    });
+}
+
+// ─── QUALITY TAB ─────────────────────────────────────
+function renderQuality() {
+  var container = document.getElementById('tab-quality');
+  container.innerHTML = '<div style="text-align:center;padding:10px;color:var(--text2);">Загрузка анализа качества...</div>';
+
+  fetch('/api/rules/quality')
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      var score = data.quality_score || 100;
+      var scoreClass = score >= 80 ? 'good' : score >= 50 ? 'warn' : 'bad';
+
+      var summary = data.summary || {};
+      var html = '<div class="quality-header">';
+      html += '<div class="quality-score ' + scoreClass + '">' + score + '</div>';
+      html += '<div class="quality-summary">';
+      html += '<div><b>Индекс качества правил</b></div>';
+      html += '<div>Всего правил: <b>' + (data.total_rules || 0) + '</b></div>';
+      html += '<div>Shadowed: <b style="color:#f59e0b;">' + (summary.shadowed_rules || 0) + '</b> | ';
+      html += 'Conflicts: <b style="color:#e94560;">' + (summary.conflicts || 0) + '</b> | ';
+      html += 'Redundant: <b style="color:#3b82f6;">' + (summary.redundant_rules || 0) + '</b> | ';
+      html += 'Unused: <b style="color:#6b7280;">' + (summary.unused_rules || 0) + '</b>';
+      html += '</div>';
+      html += '</div>';
+
+      // Shadowed rules
+      var shadowed = data.shadowed || [];
+      if (shadowed.length > 0) {
+        html += '<div style="font-weight:600;color:#f59e0b;margin:8px 0 4px;">🔽 Перекрытые правила (' + shadowed.length + ')</div>';
+        for (var i = 0; i < Math.min(shadowed.length, 10); i++) {
+          var s = shadowed[i];
+          html += '<div class="quality-card shadowed">';
+          html += '<span class="ql-badge shadowed">SHADOWED</span>';
+          html += '<b>' + escapeHtml(s.shadowed_name || '?') + '</b>';
+          html += '<div style="color:var(--text2);font-size:11px;">Перекрыто: ' + escapeHtml(s.shadower_name || '?') + '</div>';
+          html += '<div style="color:var(--text2);font-size:10px;">' + escapeHtml(s.reason || '') + '</div>';
+          html += '</div>';
+        }
+      } else {
+        html += '<div style="color:#10b981;font-size:12px;margin:6px 0;">✓ Нет перекрытых правил</div>';
+      }
+
+      // Conflicts
+      var conflicts = data.conflicts || [];
+      if (conflicts.length > 0) {
+        html += '<div style="font-weight:600;color:#e94560;margin:8px 0 4px;">⚡ Конфликты (' + conflicts.length + ')</div>';
+        for (var i = 0; i < Math.min(conflicts.length, 10); i++) {
+          var c = conflicts[i];
+          html += '<div class="quality-card conflict">';
+          html += '<span class="ql-badge conflict">CONFLICT</span>';
+          html += '<b>' + escapeHtml(c.rule_a || '?') + '</b> (' + escapeHtml(c.rule_a_action || '?') + ') ↔ ';
+          html += '<b>' + escapeHtml(c.rule_b || '?') + '</b> (' + escapeHtml(c.rule_b_action || '?') + ')';
+          html += '<div style="color:var(--text2);font-size:10px;">' + escapeHtml(c.scope_description || '') + '</div>';
+          html += '</div>';
+        }
+      } else {
+        html += '<div style="color:#10b981;font-size:12px;margin:6px 0;">✓ Нет конфликтов</div>';
+      }
+
+      // Redundant rules
+      var redundant = data.redundant || [];
+      if (redundant.length > 0) {
+        html += '<div style="font-weight:600;color:#3b82f6;margin:8px 0 4px;">🔄 Избыточные правила (' + redundant.length + ')</div>';
+        for (var i = 0; i < Math.min(redundant.length, 10); i++) {
+          var r = redundant[i];
+          html += '<div class="quality-card redundant">';
+          html += '<span class="ql-badge redundant">' + (r.count || '?') + 'x REDUNDANT</span>';
+          html += escapeHtml((r.rules || []).join(', '));
+          html += '</div>';
+        }
+      } else {
+        html += '<div style="color:#10b981;font-size:12px;margin:6px 0;">✓ Нет избыточных правил</div>';
+      }
+
+      // Unused rules
+      var unused = data.unused || [];
+      if (unused.length > 0) {
+        html += '<div style="font-weight:600;color:#6b7280;margin:8px 0 4px;">📭 Неиспользуемые/неизвестные правила (' + unused.length + ')</div>';
+        for (var i = 0; i < Math.min(unused.length, 15); i++) {
+          var u = unused[i];
+          var uStatus = u.status === 'unused' ? 'UNUSED' : u.status === 'low_hits' ? 'LOW HITS' : 'UNKNOWN';
+          var uBadgeClass = u.status === 'unused' ? 'unused' : u.status === 'low_hits' ? 'shadowed' : 'unused';
+          html += '<div class="quality-card unused">';
+          html += '<span class="ql-badge ' + uBadgeClass + '">' + uStatus + '</span>';
+          html += escapeHtml(u.rule_name || '?');
+          html += '</div>';
+        }
+      } else {
+        html += '<div style="color:#10b981;font-size:12px;margin:6px 0;">✓ Все правила используются</div>';
+      }
+
+      container.innerHTML = html;
+    })
+    .catch(function() {
+      container.innerHTML = '<div class="item"><div class="label" style="color:#e94560;">Ошибка загрузки анализа качества</div></div>';
+    });
+}
+
+function showNodeInfo(nodeId) {
+  var node = allNodes.find(function(n) { return n.id === nodeId; });
+  if (!node) {
+    document.getElementById('info-content').innerHTML = '<div class="label">Узел не найден</div>';
+    return;
+  }
+  // find related edges
+  var relatedEdges = allEdges.filter(function(e) { return e.from === nodeId || e.to === nodeId; });
+  var html = '<div class="item">';
+  html += '<div class="value" style="font-size:15px;">📌 ' + escapeHtml(node.label || node.id) + '</div>';
+  html += '<div class="label">Type: ' + escapeHtml(node.type || 'unknown') + '</div>';
+  html += '<div class="label">Zone: ' + escapeHtml(node.group || 'Unknown') + '</div>';
+  html += '<div class="label">ID: ' + escapeHtml(node.id) + '</div>';
+  html += '</div>';
+
+  html += '<div class="item"><div class="value">Связанные рёбра (' + relatedEdges.length + ')</div>';
+  relatedEdges.slice(0, 10).forEach(function(e) {
+    var other = e.from === nodeId ? e.to : e.from;
+    html += '<div class="label">↔ ' + escapeHtml(other) + ' (risk: ' + (e.risk||0) + ')</div>';
+  });
+  html += '</div>';
+
+  // find related rules
+  var relatedRules = allRules.filter(function(r) {
+    return (r.sources||'').indexOf(nodeId) >= 0 || (r.destinations||'').indexOf(nodeId) >= 0;
+  });
+  if (relatedRules.length) {
+    html += '<div class="item"><div class="value">Правила (' + relatedRules.length + ')</div>';
+    relatedRules.slice(0, 5).forEach(function(r) {
+      html += '<div class="label">📋 ' + escapeHtml(r.name||'Unknown') + ' (' + escapeHtml(r.action||'?') + ')</div>';
+    });
+    html += '</div>';
+  }
+
+  document.getElementById('info-content').innerHTML = html;
+}
+
+function doSearch() {
+  var q = document.getElementById('search-input').value.trim().toLowerCase();
+  var container = document.getElementById('search-results');
+  if (!q) { container.innerHTML = ''; return; }
+  var results = allNodes.filter(function(n) {
+    return (n.id||'').toLowerCase().indexOf(q) >= 0 || (n.label||'').toLowerCase().indexOf(q) >= 0;
+  }).slice(0, 30);
+  if (!results.length) {
+    container.innerHTML = '<div class="result" style="color:var(--text2);">Ничего не найдено</div>';
+    return;
+  }
+  var html = '';
+  results.forEach(function(n) {
+    html += '<div class="result" onclick="focusNode(\'' + n.id + '\')" style="display:flex;justify-content:space-between;align-items:center;">';
+    html += '<span>' + escapeHtml(n.label || n.id) + '</span>';
+    html += '<span style="color:var(--text2);font-size:11px;">' + escapeHtml(n.group || '?') + '</span>';
+    html += '</div>';
+  });
+  container.innerHTML = html;
+}
+
+function focusNode(nodeId) {
+  if (!network) return;
+  network.focus(nodeId, { scale: 1.5, animation: { duration: 400, easingFunction: 'easeInOutQuad' } });
+  network.selectNodes([nodeId], false);
+  showNodeInfo(nodeId);
+  document.getElementById('search-results').innerHTML = '';
+  document.getElementById('search-input').value = '';
+}
+
+// ─── UTILS ───────────────────────────────────────────
+function escapeHtml(s) {
+  if (!s) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ─── DASHBOARD ───────────────────────────────────────
+var dashboardCharts = {};
+
+function loadDashboard() {
+  fetch('/api/dashboard')
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      renderDashboard(data);
+    })
+    .catch(function(e) {
+      document.getElementById('dashboard-content').innerHTML =
+        '<div class="item"><div class="label" style="color:#e94560;">Ошибка загрузки дашборда: ' + e + '</div></div>';
+    });
+}
+
+function renderDashboard(data) {
+  var container = document.getElementById('dashboard-content');
+  if (!data.kpis || !data.kpis.length) {
+    container.innerHTML = '<div class="item"><div class="label">Нет данных для дашборда</div></div>';
+    return;
+  }
+
+  var html = '';
+
+  // KPI Cards
+  html += '<div class="kpi-grid">';
+  data.kpis.forEach(function(k) {
+    var trendClass = '';
+    if (k.trend !== null && k.trend !== undefined) {
+      trendClass = k.trend > 0 ? 'up' : k.trend < 0 ? 'down' : 'flat';
+    }
+    html += '<div class="kpi-card">';
+    html += '<div class="kpi-icon">' + (k.icon || '📊') + '</div>';
+    html += '<div class="kpi-value">' + k.value + (k.name === 'compliance' || k.name === 'rules_health' ? '%' : '') + '</div>';
+    html += '<div class="kpi-label">' + escapeHtml(k.label) + '</div>';
+    if (k.trend_display) {
+      html += '<div class="kpi-trend ' + trendClass + '">' + escapeHtml(k.trend_display) + '</div>';
+    }
+    html += '</div>';
+  });
+  html += '</div>';
+
+  // Score breakdown chart
+  if (data.security_score_breakdown) {
+    html += '<div class="chart-container"><h4>🛡️ Security Score Breakdown</h4><canvas id="chartScoreBreakdown"></canvas></div>';
+  }
+
+  // Rules health chart
+  if (data.rules_health_breakdown) {
+    html += '<div class="chart-container"><h4>📋 Rules Health</h4><canvas id="chartRulesHealth"></canvas></div>';
+  }
+
+  // Trend chart
+  if (data.trend_data && data.trend_data.length > 1) {
+    html += '<div class="chart-container"><h4>📈 Risk Trend</h4><canvas id="chartTrend"></canvas></div>';
+  }
+
+  // Top Risks
+  if (data.top_risks && data.top_risks.length) {
+    html += '<div class="top-list"><h4 style="font-size:13px;color:var(--text2);margin-bottom:6px;">⚠️ Top-10 Рисков</h4>';
+    data.top_risks.forEach(function(r, i) {
+      var sevColors = { critical: '#e94560', high: '#f59e0b', medium: '#3b82f6', low: '#10b981' };
+      html += '<div class="top-item">';
+      html += '<span class="rank">#' + (i + 1) + '</span>';
+      html += '<span class="detail"><b>' + escapeHtml(r.risk_type) + '</b> <span style="color:' + (sevColors[r.severity] || '#666') + ';">' + escapeHtml(r.severity) + '</span></span>';
+      html += '<span class="meta">' + r.count + ' шт.</span>';
+      html += '</div>';
+    });
+    html += '</div>';
+  }
+
+  // Top Changes
+  if (data.top_changes && data.top_changes.length) {
+    html += '<div class="top-list"><h4 style="font-size:13px;color:var(--text2);margin-bottom:6px;">🔄 Последние изменения</h4>';
+    data.top_changes.forEach(function(c, i) {
+      html += '<div class="top-item">';
+      html += '<span class="rank">#' + (i + 1) + '</span>';
+      html += '<span class="detail">' + escapeHtml(c.detail) + '</span>';
+      html += '<span class="meta">' + (c.affected_rules || 0) + ' rules</span>';
+      html += '</div>';
+    });
+    html += '</div>';
+  }
+
+  container.innerHTML = html;
+
+  // Draw charts after DOM update
+  setTimeout(function() {
+    drawDashboardCharts(data);
+  }, 100);
+}
+
+function drawDashboardCharts(data) {
+  // Destroy existing charts
+  Object.values(dashboardCharts).forEach(function(c) { c.destroy(); });
+  dashboardCharts = {};
+
+  // Score Breakdown — doughnut
+  var cb = document.getElementById('chartScoreBreakdown');
+  if (cb && data.security_score_breakdown) {
+    var labels = Object.keys(data.security_score_breakdown);
+    var values = Object.values(data.security_score_breakdown);
+    dashboardCharts.score = new Chart(cb, {
+      type: 'doughnut',
+      data: { labels: labels, datasets: [{ data: values, backgroundColor: ['#3b82f6','#10b981','#f59e0b','#e94560','#8b5cf6'] }] },
+      options: { responsive: true, maintainAspectRatio: true, plugins: { legend: { position: 'bottom', labels: { font: { size: 10 }, color: '#a0a0a0' } } } }
+    });
+  }
+
+  // Rules Health — bar
+  var rh = document.getElementById('chartRulesHealth');
+  if (rh && data.rules_health_breakdown) {
+    var labels2 = Object.keys(data.rules_health_breakdown);
+    var values2 = Object.values(data.rules_health_breakdown);
+    dashboardCharts.rules = new Chart(rh, {
+      type: 'bar',
+      data: { labels: labels2, datasets: [{ data: values2, backgroundColor: ['#f59e0b','#e94560','#3b82f6','#6b7280','#10b981'] }] },
+      options: { responsive: true, maintainAspectRatio: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
+    });
+  }
+
+  // Trend — line
+  var tr = document.getElementById('chartTrend');
+  if (tr && data.trend_data && data.trend_data.length > 1) {
+    var tlabels = data.trend_data.map(function(d) { return d.timestamp ? d.timestamp.substring(0, 10) : ''; });
+    var tvalues = data.trend_data.map(function(d) { return d.risk_score || 0; });
+    dashboardCharts.trend = new Chart(tr, {
+      type: 'line',
+      data: { labels: tlabels, datasets: [{ data: tvalues, borderColor: '#e94560', backgroundColor: 'rgba(233,69,96,0.1)', fill: true, tension: 0.3 }] },
+      options: { responsive: true, maintainAspectRatio: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
+    });
+  }
+}
+
+// ─── 7 TOPOLOGY MODES ────────────────────────────────
+var currentTopo = null;
+
+function showTopology(mode) {
+  currentTopo = mode;
+
+  // Toggle button active states
+  document.querySelectorAll('#topo-toolbar button[data-topo]').forEach(function(b) {
+    b.classList.toggle('active', b.dataset.topo === mode);
+  });
+
+  // Reset main mode buttons
+  document.querySelectorAll('.toolbar button[data-mode]').forEach(function(b) {
+    b.classList.remove('active');
+  });
+  document.getElementById('btn-3d').classList.remove('active');
+
+  if (!network) return;
+
+  var apiUrls = {
+    'data-flow': '/api/topology/data-flow',
+    'trust-boundary': '/api/topology/trust-boundary',
+    'resilience': '/api/topology/resilience',
+    'encryption': '/api/topology/encryption',
+    'lateral-movement': '/api/topology/lateral-movement',
+    'microseg': '/api/topology/microseg',
+    'vrf': '/api/topology/vrf',
+  };
+
+  var url = apiUrls[mode];
+  if (!url) return;
+
+  fetch(url)
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      applyTopologyData(mode, data);
+      renderTopologySummary(mode, data);
+    })
+    .catch(function(e) {
+      console.error('Topology fetch error:', e);
+    });
+}
+
+function applyTopologyData(mode, data) {
+  if (!network || !data.nodes || !data.edges) return;
+
+  // Update nodes
+  var nodeUpdates = [];
+  data.nodes.forEach(function(nd) {
+    var update = { id: nd.id };
+    if (nd.color) update.color = nd.color;
+    if (nd.size !== undefined) update.size = nd.size;
+    if (nd.title) update.title = nd.title;
+    if (nd.borderWidth !== undefined) update.borderWidth = nd.borderWidth;
+    nodeUpdates.push(update);
+  });
+  network.body.data.nodes.update(nodeUpdates);
+
+  // Update edges
+  var edgeUpdates = [];
+  data.edges.forEach(function(ed, idx) {
+    var update = { id: ed.id || String(idx) };
+    update.from = ed.from;
+    update.to = ed.to;
+    if (ed.color) update.color = ed.color;
+    if (ed.width !== undefined) update.width = ed.width;
+    if (ed.title) update.title = ed.title;
+    edgeUpdates.push(update);
+  });
+
+  // Replace edges dataset completely for topology views (different enriched data)
+  network.body.data.edges.clear();
+  network.body.data.edges.add(edgeUpdates);
+
+  renderMinimap();
+}
+
+function renderTopologySummary(mode, data) {
+  // Show summary in the info tab
+  var container = document.getElementById('tab-info');
+  var html = '';
+
+  switch (mode) {
+    case 'data-flow':
+      html = '<div class="item"><div class="value">📊 Data Flow Topology</div>';
+      html += '<div class="topo-summary">';
+      if (data.flow_summary) {
+        Object.keys(data.flow_summary).forEach(function(ft) {
+          var fc = { DB: '#3b82f6', Web: '#10b981', File: '#f59e0b', Mail: '#8b5cf6', Auth: '#e94560', Admin: '#6b7280', Other: '#999' };
+          html += '<span class="ts-chip" style="background:' + (fc[ft] || '#333') + ';color:#fff;">' + escapeHtml(ft) + ': ' + data.flow_summary[ft] + '</span>';
+        });
+      }
+      html += '</div>';
+      html += '<div class="label">🌐 Presentation: ' + (data.layer_stats ? data.layer_stats.presentation || 0 : 0) + '</div>';
+      html += '<div class="label">⚙️ Application: ' + (data.layer_stats ? data.layer_stats.application || 0 : 0) + '</div>';
+      html += '<div class="label">🗄️ Data: ' + (data.layer_stats ? data.layer_stats.data || 0 : 0) + '</div>';
+      html += '</div>';
+      break;
+    case 'trust-boundary':
+      html = '<div class="item"><div class="value">🔒 Trust Boundary</div>';
+      html += '<div class="topo-summary">';
+      if (data.boundary_summary) {
+        Object.keys(data.boundary_summary).forEach(function(k) {
+          var bc = { 'intra-zone': '#10b981', 'inter-zone': '#f59e0b', 'external': '#e94560' };
+          html += '<span class="ts-chip" style="background:' + (bc[k] || '#333') + ';color:#fff;">' + escapeHtml(k) + ': ' + data.boundary_summary[k] + '</span>';
+        });
+      }
+      html += '</div>';
+      if (data.perimeter_holes && data.perimeter_holes.length) {
+        html += '<div class="label" style="color:#e94560;">⚠️ Perimeter Holes: ' + data.perimeter_holes.length + '</div>';
+        data.perimeter_holes.slice(0, 10).forEach(function(h) {
+          html += '<div style="font-size:11px;margin:2px 0;">' + escapeHtml(h.source) + ' → ' + escapeHtml(h.target) + ' <span class="badge badge-red">' + escapeHtml(h.severity) + '</span></div>';
+        });
+      } else {
+        html += '<div class="label" style="color:#10b981;">✓ No perimeter holes</div>';
+      }
+      html += '</div>';
+      break;
+    case 'resilience':
+      html = '<div class="item"><div class="value">🔄 Resilience / Redundancy</div>';
+      if (data.spofs && data.spofs.length) {
+        html += '<div class="label" style="color:#e94560;">⚠️ SPOFs detected: ' + data.spofs.length + '</div>';
+        data.spofs.slice(0, 10).forEach(function(s) {
+          html += '<div style="font-size:11px;margin:2px 0;">' + escapeHtml(s.node_label) + ' <span class="badge badge-orange">' + escapeHtml(s.severity) + '</span><br><small>' + escapeHtml(s.reason) + '</small></div>';
+        });
+      } else {
+        html += '<div class="label" style="color:#10b981;">✓ No SPOFs</div>';
+      }
+      html += '<div class="label">Avg redundancy: <b>' + (data.redundancy_scores ? Math.round(Object.values(data.redundancy_scores).reduce(function(a,b){return a+b;},0) / Math.max(1, Object.values(data.redundancy_scores).length) * 10) / 10 : '—') + '/10</b></div>';
+      html += '</div>';
+      break;
+    case 'encryption':
+      html = '<div class="item"><div class="value">🔐 Encryption Coverage</div>';
+      html += '<div class="kpi-value" style="font-size:24px;text-align:center;">' + (data.coverage_percent || 0) + '%</div>';
+      html += '<div class="topo-summary">';
+      if (data.encryption_summary) {
+        var ec = { 'TLS 1.3': '#10b981', 'TLS 1.2': '#34d399', 'TLS 1.1': '#f59e0b', 'TLS 1.0': '#f97316', 'SSL': '#ef4444', 'PLAINTEXT': '#e94560', 'UNKNOWN': '#6b7280' };
+        Object.keys(data.encryption_summary).forEach(function(k) {
+          html += '<span class="ts-chip" style="background:' + (ec[k] || '#333') + ';color:#fff;">' + escapeHtml(k) + ': ' + data.encryption_summary[k] + '</span>';
+        });
+      }
+      html += '</div></div>';
+      break;
+    case 'lateral-movement':
+      html = '<div class="item"><div class="value">↔️ Lateral Movement</div>';
+      html += '<div class="label">East-West edges: <b style="color:#e94560;">' + (data.east_west_count || 0) + '</b> / ' + (data.total_edges || 0) + '</div>';
+      html += '<div class="label">Lateral risk score: <b>' + (data.lateral_risk_score || 0) + '%</b></div>';
+      if (data.blast_radii && data.blast_radii.length) {
+        html += '<div style="margin-top:6px;"><b>Blast Radii:</b></div>';
+        data.blast_radii.slice(0, 5).forEach(function(b) {
+          var sevColors = { critical: '#e94560', high: '#f59e0b', medium: '#3b82f6' };
+          html += '<div class="quality-card" style="border-left-color:' + (sevColors[b.severity] || '#555') + ';">';
+          html += '<b>' + escapeHtml(b.host) + '</b>: ' + b.total_reachable + ' hosts reachable';
+          html += '<div class="label">' + JSON.stringify(b.type_distribution || {}) + '</div>';
+          html += '</div>';
+        });
+      }
+      html += '</div>';
+      break;
+    case 'microseg':
+      html = '<div class="item"><div class="value">🔬 Micro-segmentation</div>';
+      html += '<div class="kpi-value" style="font-size:24px;text-align:center;">' + (data.readiness_score || 0) + '%</div>';
+      html += '<div class="label">Readiness Score</div>';
+      html += '<div class="label">Intra-zone edges: <b>' + (data.intra_zone_edges || 0) + '</b> / ' + (data.total_edges || 0) + '</div>';
+      if (data.generated_deny_rules && data.generated_deny_rules.length) {
+        html += '<div style="margin-top:6px;"><b>Suggested Deny Rules (' + data.generated_deny_rules.length + '):</b></div>';
+        data.generated_deny_rules.slice(0, 5).forEach(function(dr) {
+          html += '<div class="quality-card" style="border-left-color:#e94560;font-size:11px;">';
+          html += 'deny ' + escapeHtml(dr.source) + ' → ' + escapeHtml(dr.destination) + ' (' + escapeHtml(dr.service) + ')';
+          html += '<div class="label">' + escapeHtml(dr.reason) + '</div>';
+          html += '</div>';
+        });
+      }
+      html += '</div>';
+      break;
+    case 'vrf':
+      html = '<div class="item"><div class="value">🏢 VRF / Multi-tenancy</div>';
+      html += '<div class="label">Total VRFs: <b>' + (data.total_vrfs || 0) + '</b></div>';
+      if (data.vrfs && data.vrfs.length) {
+        html += '<div style="margin-top:4px;"><b>Tenant Isolation:</b></div>';
+        data.vrfs.forEach(function(v) {
+          var scoreColor = v.isolation_score >= 80 ? '#10b981' : v.isolation_score >= 50 ? '#f59e0b' : '#e94560';
+          html += '<div style="font-size:11px;margin:2px 0;">' + escapeHtml(v.name) + ' <span style="color:' + scoreColor + ';">' + (v.isolation_score || 0) + '%</span></div>';
+        });
+      }
+      if (data.leaks && data.leaks.length) {
+        html += '<div style="margin-top:4px;"><b style="color:#e94560;">VRF Leaks (' + data.leaks.length + '):</b></div>';
+        data.leaks.slice(0, 5).forEach(function(l) {
+          html += '<div class="quality-card" style="border-left-color:#e94560;font-size:11px;">';
+          html += escapeHtml(l.vrf_a) + ' ↔ ' + escapeHtml(l.vrf_b) + ' <span class="badge badge-red">' + escapeHtml(l.severity) + '</span>';
+          html += '<div class="label">Shared: ' + escapeHtml(l.shared_rt) + '</div>';
+          html += '</div>';
+        });
+      } else {
+        html += '<div class="label" style="color:#10b981;">✓ No VRF leaks detected</div>';
+      }
+      html += '</div>';
+      break;
+  }
+
+  container.innerHTML = html;
+
+  // Switch to info tab
+  document.querySelectorAll('.tab-nav button').forEach(function(b) { b.classList.remove('active'); });
+  var infoBtn = document.querySelector('[data-tab="tab-info"]');
+  if (infoBtn) infoBtn.classList.add('active');
+  document.querySelectorAll('.tab-content').forEach(function(tc) { tc.classList.remove('active'); });
+  var infoTab = document.getElementById('tab-info');
+  if (infoTab) infoTab.classList.add('active');
+}
+
+// ─── A1 OPTIMIZER ─────────────────────────────────────
+function renderOptimizer() {
+  var container = document.getElementById('optimizer-content');
+  container.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text2);">⚙️ Анализ оптимизации правил...</div>';
+
+  fetch('/api/optimize/preview', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({})
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(data) {
+    var score = data.score || {};
+    var preview = data.preview || {};
+    var original = preview.original_rules || [];
+    var consolidated = preview.consolidated_rules || [];
+    var groupings = preview.groupings || [];
+
+    var savingsClass = score.savings_count >= 10 ? '#10b981' : score.savings_count >= 3 ? '#f59e0b' : 'var(--text2)';
+    var compClass = score.complexity_reduction_pct >= 30 ? '#10b981' : score.complexity_reduction_pct >= 10 ? '#f59e0b' : 'var(--text2)';
+
+    var html = '';
+
+    // KPI Summary
+    html += '<div class="opt-summary">';
+    html += '<div class="opt-kpi"><div class="kpi-val" style="color:' + savingsClass + ';">' + (score.savings_count || 0) + '</div><div class="kpi-lbl">Правил сэкономлено</div></div>';
+    html += '<div class="opt-kpi savings"><div class="kpi-val">' + (score.savings_percent || 0) + '%</div><div class="kpi-lbl">Экономия</div></div>';
+    html += '<div class="opt-kpi"><div class="kpi-val">' + (score.original_count || 0) + ' → ' + (score.consolidated_count || 0) + '</div><div class="kpi-lbl">До → После</div></div>';
+    html += '<div class="opt-kpi complexity"><div class="kpi-val" style="color:' + compClass + ';">' + (score.complexity_reduction_pct || 0) + '%</div><div class="kpi-lbl">Снижение сложности</div></div>';
+    html += '</div>';
+
+    // Side-by-side comparison
+    html += '<div class="opt-compare">';
+    html += '<div class="opt-col before"><h4>📋 До оптимизации (' + original.length + ')</h4>';
+    original.slice(0, 20).forEach(function(r) {
+      html += '<div class="opt-rule"><span class="opt-name">' + escapeHtml(r.name) + '</span><span class="opt-action ' + (r.action||'permit') + '">' + escapeHtml(r.action||'?') + '</span></div>';
+    });
+    if (original.length > 20) html += '<div class="label">... и ещё ' + (original.length - 20) + ' правил</div>';
+    html += '</div>';
+
+    html += '<div class="opt-col after"><h4>✨ После оптимизации (' + consolidated.length + ')</h4>';
+    consolidated.slice(0, 20).forEach(function(r) {
+      html += '<div class="opt-rule"><span class="opt-name">' + escapeHtml(r.name) + '</span><span class="opt-action ' + (r.action||'permit') + '">' + escapeHtml(r.action||'?') + '</span></div>';
+    });
+    if (consolidated.length > 20) html += '<div class="label">... и ещё ' + (consolidated.length - 20) + ' правил</div>';
+    html += '</div>';
+    html += '</div>';
+
+    // Groupings detail
+    if (groupings.length > 0) {
+      html += '<h4 style="font-size:13px;color:var(--text2);margin:8px 0 4px;">🔗 Группы консолидации (' + groupings.length + ')</h4>';
+      groupings.slice(0, 15).forEach(function(g) {
+        html += '<div class="opt-grouping">';
+        html += '<div class="group-header">' + escapeHtml(g.source_subnet) + ' → ' + escapeHtml(g.destination) + ' : ' + escapeHtml(g.service) + '</div>';
+        html += '<div class="group-rules">' + g.rule_count + ' правил: ' + escapeHtml((g.original_rule_names||[]).join(', ')) + '</div>';
+        html += '</div>';
+      });
+      if (groupings.length > 15) html += '<div class="label">... и ещё ' + (groupings.length - 15) + ' групп</div>';
+    } else if (score.original_count > 0) {
+      html += '<div class="item" style="text-align:center;"><div class="label" style="color:#10b981;">✓ Правила уже оптимальны — grouping candidates не найдены</div></div>';
+    }
+
+    // Export button
+    html += '<button class="opt-export-btn" onclick="exportOptimizationResult()">📄 Экспорт результата</button>';
+
+    container.innerHTML = html;
+  })
+  .catch(function(e) {
+    container.innerHTML = '<div class="item"><div class="label" style="color:#e94560;">Ошибка загрузки оптимизации: ' + e + '</div></div>';
+  });
+}
+
+var _lastOptimizationResult = null;
+
+function exportOptimizationResult() {
+  if (!_lastOptimizationResult) {
+    // Re-fetch
+    fetch('/api/optimize/preview', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({})
+    }).then(function(r) { return r.json(); })
+      .then(function(d) {
+        _lastOptimizationResult = d;
+        doExport(d);
+      });
+  } else {
+    doExport(_lastOptimizationResult);
+  }
+}
+
+function doExport(data) {
+  var blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'optimization-preview.json';
+  a.click();
+}
+
+// ─── A2 IMPACT ANALYSIS ───────────────────────────────
+function analyzeImpact(nodeId) {
+  var container = document.getElementById('tab-info');
+  container.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text2);">💥 Анализ влияния для ' + escapeHtml(nodeId) + '...</div>';
+
+  // Switch to info tab
+  document.querySelectorAll('.tab-nav button').forEach(function(b) { b.classList.remove('active'); });
+  var infoBtn = document.querySelector('[data-tab="tab-info"]');
+  if (infoBtn) infoBtn.classList.add('active');
+  document.querySelectorAll('.tab-content').forEach(function(tc) { tc.classList.remove('active'); });
+  var infoTab = document.getElementById('tab-info');
+  if (infoTab) infoTab.classList.add('active');
+
+  fetch('/api/impact/analyze', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ target_type: 'node', target_id: nodeId })
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(data) {
+    var sevColors = { critical: '#e94560', high: '#f59e0b', medium: '#3b82f6', low: '#10b981' };
+
+    var html = '<div class="impact-card">';
+    html += '<div class="impact-header">';
+    html += '<span class="impact-severity ' + (data.overall_severity || 'low') + '">' + (data.overall_severity || 'low').toUpperCase() + '</span>';
+    html += '<span style="font-size:13px;font-weight:600;">' + escapeHtml((data.target||{}).label || nodeId) + '</span>';
+    html += '<span style="font-size:11px;color:var(--text2);">' + escapeHtml((data.target||{}).type || '') + '</span>';
+    html += '</div>';
+    html += '<div style="font-size:12px;margin-bottom:8px;">Затронуто: <b>' + (data.affected_count || 0) + '</b> сущностей</div>';
+    html += '</div>';
+
+    // Direct impact
+    var direct = data.direct_impact || [];
+    if (direct.length > 0) {
+      html += '<div class="impact-card"><h4 style="font-size:12px;color:#f59e0b;margin-bottom:6px;">🎯 Прямое влияние (' + direct.length + ')</h4>';
+      html += '<div class="impact-entities">';
+      direct.forEach(function(ae) {
+        html += '<div class="impact-entity">';
+        html += '<span class="ie-sev" style="background:' + (sevColors[ae.severity] || '#666') + ';"></span>';
+        html += '<span class="ie-type">' + escapeHtml(ae.type) + '</span>';
+        html += '<span class="ie-label">' + escapeHtml(ae.label) + '</span>';
+        html += '<span class="ie-reason">' + escapeHtml(ae.reason) + '</span>';
+        html += '</div>';
+      });
+      html += '</div></div>';
+    }
+
+    // Cascading impact
+    var casc = data.cascading_impact || [];
+    if (casc.length > 0) {
+      html += '<div class="impact-card"><h4 style="font-size:12px;color:#8b5cf6;margin-bottom:6px;">🔗 Каскадное влияние (' + casc.length + ')</h4>';
+      html += '<div class="impact-entities">';
+      casc.forEach(function(ae) {
+        html += '<div class="impact-entity">';
+        html += '<span class="ie-sev" style="background:' + (sevColors[ae.severity] || '#666') + ';"></span>';
+        html += '<span class="ie-type">' + escapeHtml(ae.type) + '</span>';
+        html += '<span class="ie-label">' + escapeHtml(ae.label) + '</span>';
+        html += '<span class="ie-reason">' + escapeHtml(ae.reason) + '</span>';
+        html += '</div>';
+      });
+      html += '</div></div>';
+    }
+
+    // Summary counts
+    var summary = data.summary || {};
+    html += '<div class="impact-card"><h4 style="font-size:12px;color:var(--text2);margin-bottom:6px;">📊 Сводка</h4>';
+    html += '<div style="display:flex;gap:8px;flex-wrap:wrap;font-size:11px;">';
+    html += '<span class="ts-chip">🖥️ Хосты: <b>' + ((summary.hosts||[]).length) + '</b></span>';
+    html += '<span class="ts-chip">🔧 Сервисы: <b>' + ((summary.services||[]).length) + '</b></span>';
+    html += '<span class="ts-chip">🌐 Зоны: <b>' + ((summary.zones||[]).length) + '</b></span>';
+    html += '<span class="ts-chip">📋 Правила: <b>' + ((summary.rules||[]).length) + '</b></span>';
+    html += '</div></div>';
+
+    // Critical paths
+    var paths = data.critical_paths || [];
+    if (paths.length > 0) {
+      html += '<div class="impact-card"><h4 style="font-size:12px;color:#e94560;margin-bottom:6px;">🔴 Критические пути (' + paths.length + ')</h4>';
+      paths.slice(0, 5).forEach(function(p) {
+        html += '<div style="font-size:11px;padding:3px 0;">' + p.join(' → ') + '</div>';
+      });
+      if (paths.length > 5) html += '<div class="label">... и ещё ' + (paths.length - 5) + ' путей</div>';
+      html += '</div>';
+    }
+
+    // Report button
+    html += '<button class="opt-export-btn" onclick="showImpactReport(\'' + nodeId + '\')">📝 Текстовый отчёт</button>';
+
+    container.innerHTML = html;
+  })
+  .catch(function(e) {
+    container.innerHTML = '<div class="item"><div class="label" style="color:#e94560;">Ошибка анализа влияния: ' + e + '</div></div>';
+  });
+}
+
+function showImpactReport(nodeId) {
+  fetch('/api/impact/report?type=node&id=' + encodeURIComponent(nodeId))
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      var container = document.getElementById('tab-info');
+
+      // Prepend report text before existing content
+      var existing = container.innerHTML;
+      var lines = (data.summary || '').split('\n');
+      var summaryHtml = '<pre style="background:var(--bg);color:var(--text);padding:8px;border-radius:6px;font-size:10px;max-height:200px;overflow:auto;margin-bottom:8px;white-space:pre-wrap;">' + lines.join('\n') + '</pre>';
+
+      var recs = data.recommendations || [];
+      var recsHtml = '<div class="impact-card"><h4 style="font-size:12px;color:var(--accent);margin-bottom:4px;">💡 Рекомендации</h4>';
+      recs.forEach(function(r) {
+        recsHtml += '<div style="font-size:11px;padding:2px 0;">' + escapeHtml(r) + '</div>';
+      });
+      recsHtml += '</div>';
+
+      container.innerHTML = summaryHtml + recsHtml + '<hr style="border-color:var(--border);margin:8px 0;">' + existing;
+    })
+    .catch(function(e) {
+      console.error('Report error:', e);
+    });
+}
+
+// ─── RESET TOPOLOGY (return to standard edges) ───────
+function resetTopology() {
+  currentTopo = null;
+  document.querySelectorAll('#topo-toolbar button[data-topo]').forEach(function(b) {
+    b.classList.remove('active');
+  });
+
+  if (!network) return;
+
+  // Rebuild edges from original allEdges
+  var originalEdges = allEdges.map(function(e, idx) {
+    return {
+      id: e.id || String(idx),
+      from: e.from,
+      to: e.to,
+      color: e.color || '#666',
+      width: e.width || 1,
+      title: e.title || '',
+    };
+  });
+
+  network.body.data.edges.clear();
+  network.body.data.edges.add(originalEdges);
+
+  // Reset nodes
+  var nodeUpdates = allNodes.map(function(n) {
+    return {
+      id: n.id,
+      color: n.color || '#90EE90',
+      size: n.size || 25,
+      title: n.title || n.id,
+    };
+  });
+  network.body.data.nodes.update(nodeUpdates);
+
+  renderMinimap();
+}
+
+// Reset topology when switching to standard modes
+var origSetMode = setMode;
+setMode = function(mode) {
+  resetTopology();
+  origSetMode(mode);
+};
+
+var origRenderSidebar = renderSidebar;
+renderSidebar = function() {
+  loadDashboard();
+  origRenderSidebar();
+};
+</script>
+
+<!-- Dependencies via CDN -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://unpkg.com/vis-network@9.1.6/dist/vis-network.min.js"></script>
+<script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
+<script src="https://unpkg.com/3d-force-graph@1.73.5/dist/3d-force-graph.min.js"></script>
+</body>
+</html>

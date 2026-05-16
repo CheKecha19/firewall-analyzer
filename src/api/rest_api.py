@@ -30,7 +30,9 @@ class FirewallAPI:
                 'zone',
                 'path-trace',
                 'what-if',
-                'temporal'
+                'temporal',
+                'siem-export',
+                'siem-correlate'
             ]
         }
     
@@ -291,6 +293,61 @@ class APIHandler(BaseHTTPRequestHandler):
             result = self.api.simulate_change(rules, change_type, **data)
             self._send_json(result)
         
+        elif self.path == '/api/siem/export':
+            # SIEM Export
+            issues = data.get('issues', [])
+            stats = data.get('stats', {})
+            output_dir = data.get('output_dir', 'output')
+            base_name = data.get('base_name', 'siem_export')
+            
+            export_data = {
+                'issues': issues,
+                'total_rules': stats.get('total_rules', 0),
+                'total_issues': len(issues),
+                'critical_count': stats.get('critical', 0),
+                'high_count': stats.get('high', 0),
+                'medium_count': stats.get('medium', 0),
+                'low_count': stats.get('low', 0),
+                'average_risk': stats.get('avg_risk', 5.0),
+                'compliance_score': 0,
+                'files_processed': stats.get('files_processed', 1),
+                'environment': 'production',
+            }
+            
+            from src.integrations.siem_export import export_all_formats
+            export_all_formats(export_data, output_dir, base_name)
+            
+            self._send_json({
+                'status': 'ok',
+                'formats': ['splunk', 'elastic', 'qradar', 'arcsight', 'csv', 'syslog'],
+                'output_dir': output_dir,
+            })
+        
+        elif self.path == '/api/siem/correlate':
+            # SIEM Correlation
+            issues = data.get('issues', [])
+            syslog_path = data.get('syslog_path')
+            time_window = data.get('time_window_hours', 24)
+            output_dir = data.get('output_dir', 'output')
+            base_name = data.get('base_name', 'correlation')
+            
+            from src.integrations.siem_correlator import run_correlation
+            corr_output = str(Path(output_dir) / f"{base_name}_correlation.json")
+            Path(output_dir).mkdir(parents=True, exist_ok=True)
+            
+            result = run_correlation(
+                audit_issues=issues,
+                syslog_path=syslog_path,
+                time_window_hours=time_window,
+                output_path=corr_output,
+            )
+            
+            self._send_json({
+                'status': 'ok',
+                'summary': result,
+                'output_file': corr_output,
+            })
+        
         else:
             self._send_json({'error': 'Not found'}, 404)
 
@@ -306,6 +363,8 @@ def start_api_server(host: str = 'localhost', port: int = 8080):
     print("  POST /api/audit       - Audit rules")
     print("  POST /api/path-trace  - Trace path")
     print("  POST /api/what-if     - What-If analysis")
+    print("  POST /api/siem/export - Export to SIEM formats")
+    print("  POST /api/siem/correlate - SIEM correlation")
     
     try:
         server.serve_forever()

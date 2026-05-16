@@ -68,95 +68,115 @@ class GraphVisualizer:
         import re
         return bool(re.match(r'^(\d{1,3}\.){3}\d{1,3}/\d+$', value))
     
+    def _build_agraph(self):
+        """Строит pygraphviz AGraph с раскраской узлов и рёбер."""
+        import pygraphviz as pgv
+        
+        A = nx.nx_agraph.to_agraph(self.graph)
+        
+        A.graph_attr['rankdir'] = 'LR'
+        A.graph_attr['bgcolor'] = 'white'
+        A.graph_attr['splines'] = 'true'
+        A.graph_attr['overlap'] = 'false'
+        
+        A.node_attr['shape'] = 'box'
+        A.node_attr['style'] = 'filled'
+        A.node_attr['fontname'] = 'Arial'
+        A.node_attr['fontsize'] = '10'
+        
+        # Применяем цвета к узлам
+        for node in A.nodes():
+            node_obj = A.get_node(node)
+            endpoint_type = self.graph.nodes.get(node, {}).get('endpoint_type', 'unknown')
+            node_obj.attr['fillcolor'] = self.NODE_COLORS.get(endpoint_type, self.NODE_COLORS['unknown'])
+        
+        # Применяем цвета к рёбрам по риску
+        for edge in A.edges():
+            edge_obj = A.get_edge(edge[0], edge[1])
+            src, dst = edge[0], edge[1]
+            if self.graph.has_edge(src, dst):
+                risk = self.graph[src][dst].get('risk_score', 0)
+                if risk >= 8:
+                    edge_obj.attr['color'] = 'red'
+                    edge_obj.attr['penwidth'] = '3'
+                elif risk >= 5:
+                    edge_obj.attr['color'] = 'orange'
+                    edge_obj.attr['penwidth'] = '2'
+        
+        return A
+    
+    def _draw_matplotlib(self, output_path: Path, fmt: str = 'png') -> Optional[Path]:
+        """Рисует граф через matplotlib (fallback)."""
+        import matplotlib.pyplot as plt
+        import matplotlib.patches as mpatches
+        
+        plt.figure(figsize=(20, 16))
+        
+        pos = nx.spring_layout(self.graph, k=3, iterations=100, seed=42)
+        
+        # Цвета узлов
+        node_colors = []
+        for node in self.graph.nodes():
+            endpoint_type = self.graph.nodes[node].get('endpoint_type', 'unknown')
+            node_colors.append(self.NODE_COLORS.get(endpoint_type, self.NODE_COLORS['unknown']))
+        
+        # Цвета рёбер по риску
+        edge_colors = []
+        for src, dst in self.graph.edges():
+            risk = self.graph[src][dst].get('risk_score', 0)
+            if risk >= 8:
+                edge_colors.append('red')
+            elif risk >= 5:
+                edge_colors.append('orange')
+            else:
+                edge_colors.append('gray')
+        
+        nx.draw_networkx_nodes(self.graph, pos, node_color=node_colors, 
+                              node_size=2500, alpha=0.9, linewidths=2, edgecolors='black')
+        nx.draw_networkx_edges(self.graph, pos, edge_color=edge_colors, 
+                              arrows=True, arrowsize=25, width=1.5, 
+                              connectionstyle='arc3,rad=0.1')
+        nx.draw_networkx_labels(self.graph, pos, font_size=9, font_weight='bold')
+        
+        # Легенда
+        legend_elements = [
+            mpatches.Patch(color=color, label=node_type.title())
+            for node_type, color in self.NODE_COLORS.items()
+        ]
+        plt.legend(handles=legend_elements, loc='upper right', fontsize=10)
+        
+        plt.title('Firewall Access Map', fontsize=16, fontweight='bold')
+        plt.axis('off')
+        plt.tight_layout()
+        plt.savefig(str(output_path), dpi=150, bbox_inches='tight', facecolor='white', format=fmt)
+        plt.close()
+        
+        return output_path
+    
     def generate_png(self, output_path: Path) -> Optional[Path]:
         """Генерирует статическое PNG изображение через Graphviz."""
         try:
-            import pygraphviz as pgv
-            
-            A = nx.nx_agraph.to_agraph(self.graph)
-            
-            A.graph_attr['rankdir'] = 'LR'
-            A.graph_attr['bgcolor'] = 'white'
-            A.graph_attr['splines'] = 'true'
-            A.graph_attr['overlap'] = 'false'
-            
-            A.node_attr['shape'] = 'box'
-            A.node_attr['style'] = 'filled'
-            A.node_attr['fontname'] = 'Arial'
-            A.node_attr['fontsize'] = '10'
-            
-            # Применяем цвета к узлам
-            for node in A.nodes():
-                node_obj = A.get_node(node)
-                endpoint_type = self.graph.nodes.get(node, {}).get('endpoint_type', 'unknown')
-                node_obj.attr['fillcolor'] = self.NODE_COLORS.get(endpoint_type, self.NODE_COLORS['unknown'])
-            
-            # Применяем цвета к рёбрам по риску
-            for edge in A.edges():
-                edge_obj = A.get_edge(edge[0], edge[1])
-                src, dst = edge[0], edge[1]
-                if self.graph.has_edge(src, dst):
-                    risk = self.graph[src][dst].get('risk_score', 0)
-                    if risk >= 8:
-                        edge_obj.attr['color'] = 'red'
-                        edge_obj.attr['penwidth'] = '3'
-                    elif risk >= 5:
-                        edge_obj.attr['color'] = 'orange'
-                        edge_obj.attr['penwidth'] = '2'
-            
+            A = self._build_agraph()
             A.draw(str(output_path), prog='dot', format='png')
             return output_path
-            
         except ImportError:
             try:
-                import matplotlib.pyplot as plt
-                import matplotlib.patches as mpatches
-                
-                plt.figure(figsize=(20, 16))
-                
-                pos = nx.spring_layout(self.graph, k=3, iterations=100, seed=42)
-                
-                # Цвета узлов
-                node_colors = []
-                for node in self.graph.nodes():
-                    endpoint_type = self.graph.nodes[node].get('endpoint_type', 'unknown')
-                    node_colors.append(self.NODE_COLORS.get(endpoint_type, self.NODE_COLORS['unknown']))
-                
-                # Цвета рёбер по риску
-                edge_colors = []
-                for src, dst in self.graph.edges():
-                    risk = self.graph[src][dst].get('risk_score', 0)
-                    if risk >= 8:
-                        edge_colors.append('red')
-                    elif risk >= 5:
-                        edge_colors.append('orange')
-                    else:
-                        edge_colors.append('gray')
-                
-                nx.draw_networkx_nodes(self.graph, pos, node_color=node_colors, 
-                                      node_size=2500, alpha=0.9, linewidths=2, edgecolors='black')
-                nx.draw_networkx_edges(self.graph, pos, edge_color=edge_colors, 
-                                      arrows=True, arrowsize=25, width=1.5, 
-                                      connectionstyle='arc3,rad=0.1')
-                nx.draw_networkx_labels(self.graph, pos, font_size=9, font_weight='bold')
-                
-                # Легенда
-                legend_elements = [
-                    mpatches.Patch(color=color, label=node_type.title())
-                    for node_type, color in self.NODE_COLORS.items()
-                ]
-                plt.legend(handles=legend_elements, loc='upper right', fontsize=10)
-                
-                plt.title('Firewall Access Map', fontsize=16, fontweight='bold')
-                plt.axis('off')
-                plt.tight_layout()
-                plt.savefig(str(output_path), dpi=150, bbox_inches='tight', facecolor='white')
-                plt.close()
-                
-                return output_path
-                
+                return self._draw_matplotlib(output_path, fmt='png')
             except ImportError:
                 print("[WARN] pygraphviz or matplotlib not installed. PNG not generated.")
+                return None
+    
+    def generate_pdf(self, output_path: Path) -> Optional[Path]:
+        """Генерирует PDF-документ с графом правил через Graphviz."""
+        try:
+            A = self._build_agraph()
+            A.draw(str(output_path), prog='dot', format='pdf')
+            return output_path
+        except ImportError:
+            try:
+                return self._draw_matplotlib(output_path, fmt='pdf')
+            except ImportError:
+                print("[WARN] pygraphviz or matplotlib not installed. PDF not generated.")
                 return None
     
     def generate_html(self, output_path: Path, title: str = "Firewall Access Map",

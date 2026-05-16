@@ -47,9 +47,10 @@ class PathTrace:
 class PathTracer:
     """Трассировщик пути с ACL evaluation."""
     
-    def __init__(self, rules: List, topology=None):
+    def __init__(self, rules: List, topology=None, topology_builder=None):
         self.rules = rules
         self.topology = topology
+        self.topology_builder = topology_builder  # TopologyBuilder instance
         self.nat_table: Dict[str, str] = {}  # original -> translated
     
     def trace(self, source: str, destination: str, 
@@ -302,6 +303,223 @@ class PathTracer:
         """Проверяет NAT."""
         # Заглушка — реальная реализация требует парсинга NAT rules
         return self.nat_table.get(src)
+
+    def find_all_paths(self, source: str, destination: str,
+                       port: int = 80, protocol: str = "tcp",
+                       max_paths: int = 5) -> List[PathTrace]:
+        """
+        Находит все возможные пути между source и destination (BFS).
+        Использует топологию для построения графа и поиска альтернативных маршрутов.
+        """
+        paths = []
+
+        if not self.topology_builder:
+            # Fallback: single-trace mode
+            trace = self.trace(source, destination, port, protocol)
+            return [trace]
+
+        try:
+            import networkx as nx
+
+            # Получаем граф топологии
+            if self.topology_builder.topology_graph is None:
+                self.topology_builder.build_topology_graph()
+
+            G = self.topology_builder.topology_graph
+            if G is None:
+                trace = self.trace(source, destination, port, protocol)
+                return [trace]
+
+            # Находим source/dest устройства
+            src_device = self._find_device_for_ip(source)
+            dst_device = self._find_device_for_ip(destination)
+
+            if not src_device or not dst_device:
+                trace = self.trace(source, destination, port, protocol)
+                return [trace]
+
+            if src_device not in G or dst_device not in G:
+                trace = self.trace(source, destination, port, protocol)
+                return [trace]
+
+            # BFS: находим все простые пути
+            all_simple = list(nx.all_simple_paths(G, src_device, dst_device, cutoff=8))[:max_paths]
+
+            for path_devices in all_simple:
+                trace = PathTrace(
+                    source=source,
+                    destination=destination,
+                    port=port,
+                    protocol=protocol,
+                    result=PathResult.ALLOW,
+                    hops=[]
+                )
+
+                blocked = False
+                for i, device in enumerate(path_devices):
+                    topo_dev = self.topology[device] if self.topology and device in self.topology else {}
+                    next_hop = path_devices[i + 1] if i + 1 < len(path_devices) else None
+
+                    # Check ACL on this device
+                    acl_result = self._check_acl(device, source, destination, port, protocol, "in")
+
+                    if acl_result.action == "deny":
+                        trace.hops.append(Hop(
+                            device=device,
+                            interface_in=acl_result.interface,
+                            interface_out=None,
+                            action="deny",
+                            rule_id=acl_result.rule_id,
+                            rule_name=acl_result.rule_name,
+                            details=f"ACL denied: {acl_result.details}",
+                            risk=10.0
+                        ))
+                        trace.result = PathResult.ACL_DENY
+                        trace.recommendation = f"Check ACL on {device}"
+                        blocked = True
+                        break
+
+                    # Determine out interface
+                    out_iface = None
+                    route_details = "direct"
+                    if next_hop:
+                        next_topo = self.topology.get(next_hop, {}) if self.topology else {}
+                        # Try to find connecting interface
+                        for iface_name, iface in topo_dev.get('interfaces', {}).items():
+                            iface_ip = iface.get('ip_address', '')
+                            for nif_name, nif in next_topo.get('interfaces', {}).items():
+                                nif_ip = nif.get('ip_address', '')
+                                if iface_ip and nif_ip:
+                                    try:
+                                        net1 = ipaddress.ip_network(f"{iface_ip}/{iface.get('subnet', '24')}", strict=False)
+                                        if ipaddress.ip_address(nif_ip.split('/')[0]) in net1:
+                                            out_iface = iface_name
+                                            route_details = f"to {next_hop} via {iface_name}"
+                                            break
+                                    except:
+                                        pass
+
+                    trace.hops.append(Hop(
+                        device=device,
+                        interface_in=acl_result.interface,
+                        interface_out=out_iface,
+                        action="forward",
+                        rule_id=acl_result.rule_id,
+                        rule_name=acl_result.rule_name,
+                        details=route_details,
+                        risk=0.5
+                    ))
+
+                if not blocked:
+                    trace.result = PathResult.ALLOW
+                    trace.recommendation = f"Path via {' → '.join(path_devices)}"
+
+                trace.total_risk = sum(h.risk for h in trace.hops) / max(len(trace.hops), 1)
+                paths.append(trace)
+
+            return paths if paths else [self.trace(source, destination, port, protocol)]
+
+        except ImportError:
+            trace = self.trace(source, destination, port, protocol)
+            return [trace]
+
+    def to_visjs(self, trace: PathTrace, output_path: str = None) -> Dict:
+        """
+        Конвертирует результат трассировки в Vis.js формат для визуализации.
+
+        Returns:
+            Dict с 'nodes' и 'edges' для Vis.js
+        """
+        nodes = []
+        edges = []
+        node_ids = set()
+
+        colors = {
+            PathResult.ALLOW: '#2ecc71',
+            PathResult.DENY: '#e74c3c',
+            PathResult.NO_ROUTE: '#f39c12',
+            PathResult.ACL_DENY: '#e74c3c',
+            PathResult.NAT_REQUIRED: '#9b59b6',
+        }
+
+        # Добавляем source и destination как start/end ноды
+        src_id = f"src_{trace.source}"
+        dst_id = f"dst_{trace.destination}"
+
+        nodes.append({
+            'id': src_id,
+            'label': f"SOURCE\n{trace.source}",
+            'group': 'source',
+            'color': '#3498db',
+            'shape': 'star',
+            'size': 30,
+            'title': f"Source: {trace.source}<br>Port: {trace.port}<br>Protocol: {trace.protocol}"
+        })
+        nodes.append({
+            'id': dst_id,
+            'label': f"DEST\n{trace.destination}",
+            'group': 'destination',
+            'color': '#e67e22',
+            'shape': 'star',
+            'size': 30,
+            'title': f"Destination: {trace.destination}<br>Port: {trace.port}"
+        })
+
+        prev_id = src_id
+
+        for i, hop in enumerate(trace.hops):
+            hop_id = f"hop_{i}_{hop.device}"
+            color = '#2ecc71' if hop.action in ('permit', 'forward') else '#e74c3c'
+
+            nodes.append({
+                'id': hop_id,
+                'label': f"{hop.device}\n{hop.action}",
+                'group': 'device',
+                'color': color,
+                'shape': 'box',
+                'size': 25,
+                'title': f"<b>{hop.device}</b><br>"
+                         f"Action: {hop.action}<br>"
+                         f"In: {hop.interface_in}<br>"
+                         f"Out: {hop.interface_out}<br>"
+                         f"Rule: {hop.rule_name or 'N/A'}<br>"
+                         f"Details: {hop.details}<br>"
+                         f"Risk: {hop.risk}"
+            })
+
+            # Edge from previous to this hop
+            edge_color = '#2ecc71' if hop.action in ('permit', 'forward') else '#e74c3c'
+            edges.append({
+                'from': prev_id,
+                'to': hop_id,
+                'color': edge_color,
+                'arrows': 'to',
+                'width': 3,
+                'label': f"Hop {i + 1}"
+            })
+
+            prev_id = hop_id
+
+        # Final edge to destination
+        result_color = colors.get(trace.result, '#95a5a6')
+        edges.append({
+            'from': prev_id,
+            'to': dst_id,
+            'color': result_color,
+            'arrows': 'to',
+            'width': 3,
+            'dashes': trace.result != PathResult.ALLOW,
+            'label': trace.result.value.upper()
+        })
+
+        result = {'nodes': nodes, 'edges': edges}
+
+        if output_path:
+            import json
+            with open(output_path, 'w', encoding='utf-8') as f:
+                json.dump(result, f, ensure_ascii=False, indent=2)
+
+        return result
 
 
 # Экспорт

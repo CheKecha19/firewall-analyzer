@@ -29,6 +29,8 @@ Examples:
   %(prog)s configs/ --source usergate --recursive --html
   %(prog)s configs/ --audit --risk-report --output security_audit
   %(prog)s configs/ --aggregate-subnets --parallel
+  %(prog)s configs/ --temporal-view --temporal-days 90
+  %(prog)s configs/ --diff-old old_config.txt --diff-new new_config.txt --diff-format html
             """
         )
         
@@ -86,6 +88,12 @@ Examples:
             '--png',
             action='store_true',
             help='Generate static PNG image'
+        )
+        
+        parser.add_argument(
+            '--pdf',
+            action='store_true',
+            help='Generate PDF document with graph'
         )
         
         parser.add_argument(
@@ -168,6 +176,13 @@ Examples:
             help='Export zone compliance matrix'
         )
         
+        # Service/App Topology (Stage 3)
+        parser.add_argument(
+            '--svc-view',
+            action='store_true',
+            help='Generate service/application topology view'
+        )
+        
         # Advanced Analytics (Stage 4)
         parser.add_argument(
             '--what-if',
@@ -221,7 +236,7 @@ Examples:
         parser.add_argument(
             '--temporal-view',
             action='store_true',
-            help='Generate temporal timeline view'
+            help='Generate Diff Mode + Temporal Timeline view (unified)'
         )
         
         parser.add_argument(
@@ -231,12 +246,31 @@ Examples:
             help='Days of history for temporal view (default: 30)'
         )
         
-        # Integrations (Stage 5 - DISABLED)
-        # parser.add_argument(
-        #     '--siem-export',
-        #     action='store_true',
-        #     help='Export results to SIEM formats (Splunk, ELK, QRadar, CEF)'
-        # )
+        # Integrations (Stage 5)
+        parser.add_argument(
+            '--siem-export',
+            action='store_true',
+            help='Export results to SIEM formats (Splunk, ELK, QRadar, ArcSight CEF, Syslog, CSV)'
+        )
+        
+        parser.add_argument(
+            '--siem-correlate',
+            action='store_true',
+            help='Enable live SIEM correlation (match audit findings against syslog/event data)'
+        )
+        
+        parser.add_argument(
+            '--siem-correlate-file',
+            type=str,
+            help='Path to syslog/event log file for correlation analysis'
+        )
+        
+        parser.add_argument(
+            '--siem-correlate-hours',
+            type=int,
+            default=24,
+            help='Time window for correlation in hours (default: 24)'
+        )
         
         # Config diff options
         parser.add_argument(
@@ -283,6 +317,33 @@ Examples:
             help='Verbose output'
         )
         
+        # WEB UI
+        parser.add_argument(
+            '--web',
+            action='store_true',
+            help='Start interactive WEB UI server'
+        )
+        
+        parser.add_argument(
+            '--web-host',
+            type=str,
+            default='127.0.0.1',
+            help='WEB UI host (default: 127.0.0.1)'
+        )
+        
+        parser.add_argument(
+            '--web-port',
+            type=int,
+            default=8000,
+            help='WEB UI port (default: 8000)'
+        )
+        
+        parser.add_argument(
+            '--web-open',
+            action='store_true',
+            help='Open browser automatically'
+        )
+        
         parser.add_argument(
             '--version',
             action='version',
@@ -315,10 +376,11 @@ Examples:
             self.parser.error(f"Path not found: {parsed.input_path}")
         
         # If no output formats specified, enable all
-        if not parsed.html and not parsed.png and not parsed.dot:
+        if not parsed.html and not parsed.png and not parsed.dot and not parsed.pdf:
             parsed.html = True
             parsed.png = True
             parsed.dot = True
+            parsed.pdf = True
         
         # Security audit implies HTML for visualization
         if parsed.audit and not parsed.html:
