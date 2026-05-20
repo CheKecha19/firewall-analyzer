@@ -541,18 +541,21 @@ class GraphVisualizer:
         audit_data = []
         try:
             from src.core.security_auditor import SecurityAuditor
-            auditor = SecurityAuditor(self.graph, self.rules)
-            findings = auditor.run_full_audit()
-            for f in findings:
+            auditor = SecurityAuditor(self.rules, self.graph)
+            report = auditor.run_full_audit()
+            # run_full_audit returns dict: {'summary': ..., 'issues': [dict, ...]}
+            for f in report.get('issues', []):
                 audit_data.append({
-                    'type': f.finding_type,
-                    'severity': f.severity,
-                    'description': f.description,
-                    'affected': str(f.affected) if hasattr(f, 'affected') else '',
-                    'remediation': f.remediation if hasattr(f, 'remediation') else ''
+                    'type': f.get('type', ''),
+                    'severity': f.get('severity', 'info'),
+                    'description': f.get('description', ''),
+                    'rule_name': f.get('rule', ''),
+                    'recommendation': f.get('recommendation', '')
                 })
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"[AUDIT] Skipped in generate_html: {e}")
+        except Exception as e:
+            print(f"[AUDIT] Skipped in generate_html: {e}")
 
         # ── Stats ──
         all_zones = sorted(set(data.get('zone') or 'Unknown' for _, data in self.graph.nodes(data=True)))
@@ -562,6 +565,44 @@ class GraphVisualizer:
             'total_edges': self.graph.number_of_edges(),
             'zones': all_zones
         }
+
+        # ── Static mode: pre-load all API data for offline HTML ──
+        # Dashboard data
+        try:
+            from src.core.dashboard import get_dashboard_json
+            dashboard_data = get_dashboard_json(
+                issues=audit_data,
+                rules=rules_table,
+                graph_stats=stats,
+                zones=all_zones
+            )
+            dashboard_json = json.dumps(dashboard_data, ensure_ascii=False)
+        except Exception as e:
+            print(f"[WARN] Dashboard generation failed: {e}")
+            dashboard_json = '{}'
+
+        # Risk severity data
+        risk_severity_data = self._generate_risk_severity_data()
+        risk_severity_json = json.dumps(risk_severity_data, ensure_ascii=False)
+
+        # Services data
+        service_data = self._generate_service_data()
+        service_json = json.dumps(service_data, ensure_ascii=False)
+
+        # MITRE data
+        try:
+            from src.core.mitre_mapper import MitreMapper
+            from dataclasses import asdict
+            mapper = MitreMapper()
+            mitre_report = mapper.map_all(audit_data)
+            mitre_data = [asdict(m) for m in (mitre_report.matches if mitre_report else [])]
+            mitre_json = json.dumps(mitre_data, ensure_ascii=False)
+        except Exception as e:
+            print(f"[WARN] MITRE mapping failed: {e}")
+            mitre_json = '[]'
+
+        # STATIC_MODE flag
+        static_mode = 'true'
 
         # ── Zones options ──
         zones = all_zones
@@ -581,6 +622,11 @@ class GraphVisualizer:
         html = html.replace('__AUDIT_JSON__', json.dumps(audit_data, ensure_ascii=False))
         html = html.replace('__STATS_JSON__', json.dumps(stats, ensure_ascii=False))
         html = html.replace('__ZONES_OPTIONS__', zones_options)
+        html = html.replace('__DASHBOARD_JSON__', dashboard_json)
+        html = html.replace('__RISK_SEVERITY_JSON__', risk_severity_json)
+        html = html.replace('__SERVICES_JSON__', service_json)
+        html = html.replace('__MITRE_JSON__', mitre_json)
+        html = html.replace('__STATIC_MODE__', static_mode)
 
         # ── Write output ──
         output_path.parent.mkdir(parents=True, exist_ok=True)

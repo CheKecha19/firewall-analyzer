@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Firewall Analyzer WEB UI</title>
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 <style>
 :root, [data-theme="dark"] {
   --bg: #0d1117;
@@ -675,17 +676,18 @@ path-panel .hop.accepted { background: #27ae60; color: #fff; border-color: #1e84
 </header>
 
 <div class="toolbar">
-  <button data-mode="standard" class="active" onclick="setMode('standard')">⚡ Стандарт</button>
-  <button data-mode="hierarchy" onclick="setMode('hierarchy')">📊 Иерархия</button>
-  <button data-mode="circle" onclick="setMode('circle')">🔄 Круг</button>
-  <button data-mode="risk" onclick="setMode('risk')">🔥 Риск</button>
-  <button data-mode="attack" onclick="setMode('attack')">⚔️ Attack</button>
+  <button data-mode="standard" class="active" onclick="setMode('standard')">🔷 Standard</button>
+  <button data-mode="hierarchy" onclick="setMode('hierarchy')">🔶 Hierarchy</button>
+  <button data-mode="circle" onclick="setMode('circle')">⭕ Circle</button>
+  <button data-mode="risk" onclick="setMode('risk')">⚠️ Risk</button>
+  <button data-mode="attack" onclick="setMode('attack')">🎯 Attack</button>
   <span class="sep"></span>
   <button id="btn-3d" onclick="toggle3D()">🌐 3D</button>
   <span class="sep"></span>
   <button onclick="exportPNG()">📷 PNG</button>
   <button onclick="exportJSON()">📄 JSON</button>
-  <button onclick="siemExport()">🛡️ SIEM</button>
+  <span class="sep"></span>
+  <button id="btn-settings" onclick="toggleSettings()" title="Настройки">⚙️</button>
   <span class="sep"></span>
   <select id="zone-filter" onchange="applyZoneFilter()">
     <option value="">Все зоны</option>
@@ -831,6 +833,13 @@ var allRules = __RULES_JSON__;
 var allAudit = __AUDIT_JSON__;
 var statsData = __STATS_JSON__;
 
+// ─── STATIC MODE ────────────────────────────────────
+var STATIC_MODE = __STATIC_MODE__ || false;
+var __dashboardData = __DASHBOARD_JSON__;
+var __riskSeverityData = __RISK_SEVERITY_JSON__;
+var __servicesData = __SERVICES_JSON__;
+var __mitreData = __MITRE_JSON__;
+
 // ─── STATE ───────────────────────────────────────────
 var currentMode = 'standard';
 var is3D = false;
@@ -855,6 +864,12 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 function applyBranding() {
+  if (STATIC_MODE) {
+    var titleEl = document.getElementById('brand-title');
+    var defaultTitle = getComputedStyle(document.documentElement).getPropertyValue('--title-text').replace(/'/g, '').trim() || 'Firewall Analyzer';
+    if (titleEl) titleEl.textContent = defaultTitle;
+    return;
+  }
   fetch('/api/branding')
     .then(function(r) { return r.json(); })
     .then(function(branding) {
@@ -896,10 +911,10 @@ function applyBranding() {
 }
 
 function updateStats() {
-  document.getElementById('stat-nodes').textContent = statsData.nodes || 0;
-  document.getElementById('stat-edges').textContent = statsData.edges || 0;
-  document.getElementById('stat-rules').textContent = statsData.rules || 0;
-  document.getElementById('stat-issues').textContent = statsData.issues || 0;
+  document.getElementById('stat-nodes').textContent = allNodes.length;
+  document.getElementById('stat-edges').textContent = allEdges.length;
+  document.getElementById('stat-rules').textContent = allRules.length;
+  document.getElementById('stat-issues').textContent = allAudit ? allAudit.length : 0;
 }
 
 // ─── THEME ───────────────────────────────────────────
@@ -1027,7 +1042,23 @@ function initNetwork() {
     renderMinimap();
   });
 
-  network.on('dragEnd', function() { renderMinimap(); });
+  network.on('dragStart', function(params) {
+    if (params.nodes.length > 0) {
+      network.setOptions({ physics: { enabled: false } });
+    }
+  });
+
+  network.on('dragEnd', function(params) {
+    if (params.nodes.length > 0) {
+      network.setOptions({ physics: { enabled: true, stabilization: { iterations: 50 } } });
+      setTimeout(function() {
+        network.setOptions({ physics: { enabled: false } });
+        renderMinimap();
+      }, 1000);
+    } else {
+      renderMinimap();
+    }
+  });
   network.on('zoom', function() { renderMinimap(); });
 
   setTimeout(function() { document.getElementById('loading').style.display = 'none'; renderMinimap(); }, 3000);
@@ -1045,31 +1076,57 @@ function setMode(mode) {
   updateHash();
   if (!network) return;
 
-  var physics;
-  var layout;
+  var physics, layout;
   switch (mode) {
     case 'standard':
-      physics = { solver: 'forceAtlas2Based', forceAtlas2Based: { gravitationalConstant: -50, springLength: 100 } };
+      physics = { enabled: true, solver: 'barnesHut', barnesHut: { gravitationalConstant: -2000, springLength: 150 }, stabilization: { iterations: 100 } };
       layout = { hierarchical: false };
       break;
     case 'hierarchy':
-      physics = { solver: 'hierarchicalRepulsion' };
-      layout = { hierarchical: { enabled: true, direction: 'LR', sortMethod: 'directed', nodeSpacing: 150 } };
+      physics = { enabled: true, solver: 'hierarchicalRepulsion', stabilization: { iterations: 100 } };
+      layout = { hierarchical: { enabled: true, direction: 'UD', sortMethod: 'directed', nodeSpacing: 150, levelSeparation: 200 } };
       break;
     case 'circle':
-      physics = { solver: 'barnesHut', barnesHut: { gravitationalConstant: -8000, springLength: 250, centralGravity: 5 } };
+      physics = { enabled: false };
       layout = { hierarchical: false };
-      break;
+      // Manual circular layout
+      var nodeIds = allNodes.map(function(n) { return n.id; });
+      var cx = 0, cy = 0, r = Math.max(300, nodeIds.length * 15);
+      var positions = {};
+      nodeIds.forEach(function(id, i) {
+        var angle = (2 * Math.PI * i) / nodeIds.length;
+        positions[id] = { x: cx + r * Math.cos(angle), y: cy + r * Math.sin(angle) };
+      });
+      network.setOptions({ physics: physics, layout: layout });
+      network.moveTo({ position: { x: 0, y: 0 }, scale: 1 });
+      setTimeout(function() {
+        network.storePositions();
+        // Actually set positions via data update
+        var nodes = network.body.data.nodes.get();
+        nodes.forEach(function(n) {
+          if (positions[n.id]) {
+            network.body.data.nodes.update({ id: n.id, x: positions[n.id].x, y: positions[n.id].y });
+          }
+        });
+      }, 100);
+      renderMinimap();
+      return;
     case 'risk':
-      physics = { solver: 'barnesHut', barnesHut: { gravitationalConstant: -2000, springLength: 100 + allEdges.reduce(function(s,e){return s+(e.risk||0);},0)/Math.max(1,allEdges.length) } };
+      physics = { enabled: true, solver: 'barnesHut', barnesHut: { gravitationalConstant: -3000, springLength: 100, centralGravity: 1 } };
       layout = { hierarchical: false };
       break;
     case 'attack':
       renderAttackGraph();
       return;
+    default:
+      physics = { enabled: true };
+      layout = { hierarchical: false };
   }
   network.setOptions({ physics: physics, layout: layout });
-  renderMinimap();
+  setTimeout(function() {
+    network.stabilize(100);
+    renderMinimap();
+  }, 200);
 }
 
 function updateHash() {
@@ -1125,14 +1182,23 @@ function updateSelection() {
 
 // ─── EXPORT ──────────────────────────────────────────
 function exportPNG() {
-  if (!network) return;
-  var cvs = document.getElementById('network-canvas');
-  var ctx = cvs.getContext('2d');
-  var dataUrl = network.canvas.frame.canvas.toDataURL('image/png');
-  var a = document.createElement('a');
-  a.href = dataUrl;
-  a.download = 'firewall-graph.png';
-  a.click();
+  var target = document.getElementById('mynetwork');
+  if (!target) return;
+  
+  html2canvas(target, { 
+    backgroundColor: document.documentElement.getAttribute('data-theme') === 'light' ? '#ffffff' : '#0d1117',
+    scale: 2
+  }).then(function(canvas) {
+    var link = document.createElement('a');
+    link.download = 'firewall_map.png';
+    link.href = canvas.toDataURL('image/png');
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }).catch(function(err) {
+    console.error('PNG export failed:', err);
+    alert('Ошибка экспорта PNG');
+  });
 }
 
 function exportJSON() {
@@ -1144,17 +1210,7 @@ function exportJSON() {
   a.click();
 }
 
-function siemExport() {
-  var od = prompt('Output directory:', 'output');
-  if (!od) return;
-  fetch('/api/siem/export', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ output_dir: od, base_name: 'siem_export' })
-  }).then(function(r) { return r.json(); })
-    .then(function(d) { alert('SIEM экспорт завершен: ' + JSON.stringify(d.formats)); })
-    .catch(function(e) { alert('Ошибка: ' + e); });
-}
+
 
 // ─── 3D GRAPH ────────────────────────────────────────
 function toggle3D() {
@@ -1164,14 +1220,20 @@ function toggle3D() {
   var g3d = document.getElementById('graph3d');
   var loading = document.getElementById('loading');
   if (is3D) {
+    // Check if ForceGraph3D is available
+    if (typeof ForceGraph3D === 'undefined') {
+      console.warn('3D library not loaded');
+      is3D = false;
+      return;
+    }
     btn3d.textContent = '📊 2D';
     btn3d.classList.add('active');
-    // Hide 2D network (vis-network canvas is inside #mynetwork)
-    var canvasEl = nd.querySelector('canvas');
-    if (canvasEl) canvasEl.style.display = 'none';
-    nd.style.pointerEvents = 'none';
-    g3d.style.display = 'block';
+    // Hide 2D
+    nd.style.display = 'none';
     document.getElementById('minimap').style.display = 'none';
+    g3d.style.display = 'block';
+    // Stop 2D physics while in 3D
+    if (network) network.setOptions({ physics: { enabled: false } });
     if (loading) loading.style.display = 'block';
     init3DGraph();
     setTimeout(function() {
@@ -1180,12 +1242,19 @@ function toggle3D() {
   } else {
     btn3d.textContent = '🌐 3D';
     btn3d.classList.remove('active');
-    var canvasEl = nd.querySelector('canvas');
-    if (canvasEl) canvasEl.style.display = '';
-    nd.style.pointerEvents = '';
+    // Show 2D
+    nd.style.display = 'block';
     g3d.style.display = 'none';
     g3d.innerHTML = '';
-    if (network) { network.redraw(); renderMinimap(); }
+    document.getElementById('minimap').style.display = 'block';
+    if (network) {
+      network.redraw();
+      network.setOptions({ physics: { enabled: true, stabilization: { iterations: 50 } } });
+      setTimeout(function() {
+        network.setOptions({ physics: { enabled: false } });
+        renderMinimap();
+      }, 800);
+    }
   }
 }
 
@@ -1210,6 +1279,11 @@ function riskColor(score) {
 }
 
 function init3DGraph() {
+  if (typeof ForceGraph3D === 'undefined') {
+    var el = document.getElementById('graph3d');
+    el.innerHTML = '<div style="color:#f88;padding:40px;text-align:center;font-size:16px;">3D library not loaded. Check CDN connection.</div>';
+    return;
+  }
   var el = document.getElementById('graph3d');
   el.innerHTML = '';
 
@@ -1886,9 +1960,11 @@ function renderRules() {
     container.innerHTML = '<div class="item"><div class="label">Нет правил</div></div>';
     return;
   }
-  var html = '';
+  var html = '<input type="text" id="rules-search" placeholder="Поиск по правилам (имя, IP, сервис...)" style="width:100%;padding:8px 12px;margin-bottom:8px;background:var(--bg3);border:1px solid var(--border);color:var(--text);border-radius:4px;font-size:13px;">';
+  html += '<div id="rules-search-count" style="font-size:11px;color:var(--muted);margin-bottom:6px;">' + allRules.length + ' / ' + allRules.length + '</div>';
+  html += '<div id="rules-list">';
   allRules.forEach(function(r) {
-    html += '<div class="item">';
+    html += '<div class="item rule-row">';
     html += '<div class="value">' + escapeHtml(r.name || 'Unknown') + '</div>';
     html += '<div class="label">From: ' + escapeHtml(r.sources || '-') + ' → To: ' + escapeHtml(r.destinations || '-') + '</div>';
     html += '<div style="margin-top:4px;">';
@@ -1897,7 +1973,24 @@ function renderRules() {
     html += '</div>';
     html += '</div>';
   });
+  html += '</div>';
   container.innerHTML = html;
+  // Attach search handler after DOM is populated
+  var rulesSearchTimer = null;
+  document.getElementById('rules-search').addEventListener('input', function() {
+    clearTimeout(rulesSearchTimer);
+    rulesSearchTimer = setTimeout(function() {
+      var q = document.getElementById('rules-search').value.toLowerCase();
+      var rows = document.querySelectorAll('#tab-rules .rule-row');
+      rows.forEach(function(row) {
+        var text = row.textContent.toLowerCase();
+        row.style.display = text.indexOf(q) >= 0 ? '' : 'none';
+      });
+      var visible = document.querySelectorAll('#tab-rules .rule-row:not([style*="display: none"])').length;
+      var counter = document.getElementById('rules-search-count');
+      if (counter) counter.textContent = visible + ' / ' + allRules.length;
+    }, 300);
+  });
 }
 
 function renderAudit() {
@@ -1946,6 +2039,10 @@ function maxSeverity(sevA, sevB) {
 
 function renderMitre() {
   var container = document.getElementById('tab-mitre');
+  if (STATIC_MODE) {
+    _renderMitreStatic(container);
+    return;
+  }
   fetch('/api/mitre/matrix')
     .then(function(r) { return r.json(); })
     .then(function(data) {
@@ -2020,6 +2117,72 @@ function renderMitre() {
     .catch(function() {
       container.innerHTML = '<div class="item"><div class="label">Ошибка загрузки MITRE данных</div></div>';
     });
+}
+
+function _renderMitreStatic(container) {
+  var matches = __mitreData;
+  if (!matches || !matches.length) {
+    container.innerHTML = '<div class="item"><div class="label">Нет MITRE-матчей — findings отсутствуют или не подходят под известные техники</div></div>';
+    return;
+  }
+
+  // Build matrix from matches: tactic -> {technique_id: count}
+  var matrix = {};
+  var techSeverity = {};
+  var techNames = {};
+  var tacticsSet = {};
+  var techniquesSet = {};
+  for (var k = 0; k < matches.length; k++) {
+    var m = matches[k];
+    var tactic = m.tactic || 'Unknown';
+    var tid = m.technique_id || '?';
+    var sev = m.severity || (m.confidence === 'high' ? 'high' : 'medium');
+    if (!matrix[tactic]) matrix[tactic] = {};
+    matrix[tactic][tid] = (matrix[tactic][tid] || 0) + 1;
+    techSeverity[tid] = techSeverity[tid] ? maxSeverity(techSeverity[tid], sev) : sev;
+    if (!techNames[tid]) techNames[tid] = m.technique_name || tid;
+    tacticsSet[tactic] = true;
+    techniquesSet[tid] = true;
+  }
+
+  var totalTechniques = Object.keys(techniquesSet).length;
+  var totalTactics = Object.keys(tacticsSet).length;
+
+  var html = '<div class="mitre-summary">';
+  html += '<span>🛡️ Тактик: <b>' + totalTactics + '</b></span>';
+  html += '<span>🎯 Техник: <b>' + totalTechniques + '</b></span>';
+  html += '<span>📊 Совпадений: <b>' + matches.length + '</b></span>';
+  html += '</div>';
+
+  html += '<details style="margin-bottom:8px"><summary style="cursor:pointer;font-size:11px;color:var(--accent)">📖 Легенда тактик MITRE ATT&CK</summary>';
+  html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:2px 12px;font-size:10px;margin-top:4px;padding:6px;background:var(--card-bg);border-radius:4px">';
+  var mitreTacticsSorted = ['Reconnaissance','Resource Development','Initial Access','Execution','Persistence','Privilege Escalation','Defense Evasion','Credential Access','Discovery','Lateral Movement','Collection','Command and Control','Exfiltration','Impact'];
+  for (var ti = 0; ti < mitreTacticsSorted.length; ti++) {
+    var t = mitreTacticsSorted[ti];
+    var covered = matrix[t] ? '✅' : '⬜';
+    var desc = MITRE_TACTIC_INFO[t] || '';
+    html += '<div style="padding:1px 0">' + covered + ' <b>' + escapeHtml(t) + '</b> <span style="color:var(--text2)">' + desc + '</span></div>';
+  }
+  html += '</div></details>';
+
+  html += '<table class="mitre-matrix"><thead><tr><th style="width:25%">Tactic</th><th>Techniques</th></tr></thead><tbody>';
+  var tactics = Object.keys(matrix).sort();
+  for (var i = 0; i < tactics.length; i++) {
+    var tactic = tactics[i];
+    var techniques = matrix[tactic];
+    html += '<tr><td style="font-weight:600;vertical-align:middle">' + escapeHtml(tactic) + '</td><td>';
+    var techIds = Object.keys(techniques).sort();
+    for (var j = 0; j < techIds.length; j++) {
+      var techId = techIds[j];
+      var count = techniques[techId];
+      var sev = techSeverity[techId] || 'medium';
+      var tname = techNames[techId] || techId;
+      html += '<span class="tech-badge ' + sev + '" title="' + escapeHtml(tname) + ' (' + count + ' finding' + (count > 1 ? 's' : '') + ')">' + escapeHtml(techId) + '</span> ';
+    }
+    html += '</td></tr>';
+  }
+  html += '</tbody></table>';
+  container.innerHTML = html;
 }
 
 function filterMitreTechnique(techId) {
@@ -2545,6 +2708,28 @@ function showNodeInfo(nodeId) {
     html += '</div>';
   }
 
+  // ── Related Rules from edges ──
+  var edgeRulesList = [];
+  allEdges.forEach(function(e) {
+    if (e.from === nodeId || e.to === nodeId) {
+      var edgeRules = e.rules || e.title || '';
+      if (edgeRules) edgeRulesList.push({ from: e.from, to: e.to, rules: edgeRules });
+    }
+  });
+
+  if (edgeRulesList.length > 0) {
+    html += '<div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--border);">';
+    html += '<div class="label" style="font-weight:600;margin-bottom:4px;">Связанные правила (' + edgeRulesList.length + ')</div>';
+    edgeRulesList.forEach(function(r, i) {
+      var rulesText = typeof r.rules === 'string' ? r.rules : (r.rules.join ? r.rules.join(', ') : String(r.rules));
+      html += '<div class="item" style="font-size:11px;padding:3px 6px;margin:2px 0;background:var(--bg3);border-radius:3px;cursor:pointer;" onclick="focusNode(\'' + r.from + '\');setTimeout(function(){focusNode(\'' + r.to + '\')},200)">';
+      html += '<span style="color:var(--accent);">' + escapeHtml(r.from) + ' → ' + escapeHtml(r.to) + '</span>';
+      html += '<br><span style="color:var(--text2);font-size:10px;">' + escapeHtml(rulesText) + '</span>';
+      html += '</div>';
+    });
+    html += '</div>';
+  }
+
   document.getElementById('info-content').innerHTML = html;
 }
 
@@ -2588,6 +2773,12 @@ function escapeHtml(s) {
 var dashboardCharts = {};
 
 function loadDashboard() {
+  if (STATIC_MODE) {
+    if (__dashboardData && __dashboardData.kpis) {
+      renderDashboard(__dashboardData);
+    }
+    return;
+  }
   fetch('/api/dashboard')
     .then(function(r) { return r.json(); })
     .then(function(data) {
@@ -2823,6 +3014,13 @@ function showTopology(mode) {
     b.classList.remove('active');
   });
   document.getElementById('btn-3d').classList.remove('active');
+
+  if (STATIC_MODE) {
+    var container = document.getElementById('tab-info');
+    container.innerHTML = '<div class="item"><div class="label">Топологии доступны в веб-режиме (python main.py configs/ --web)</div></div>';
+    switchTab('tab-info');
+    return;
+  }
 
   if (!network) return;
 
@@ -3382,6 +3580,12 @@ renderSidebar = function() {
 // ─── RISK DONUT (Canvas 2D) ─────────────────────────
 
 function loadRiskDonut() {
+  if (STATIC_MODE) {
+    if (__riskSeverityData && __riskSeverityData.length) {
+      drawRiskDonut(__riskSeverityData);
+    }
+    return;
+  }
   fetch('/api/risk-severity')
     .then(function(r) { return r.json(); })
     .then(function(data) { drawRiskDonut(data); })
@@ -3471,6 +3675,12 @@ function drawRiskDonut(data) {
 // ─── SERVICE TABLE ───────────────────────────────────
 
 function loadServiceTable() {
+  if (STATIC_MODE) {
+    if (__servicesData && __servicesData.length) {
+      renderServiceTable(__servicesData);
+    }
+    return;
+  }
   fetch('/api/services')
     .then(function(r) { return r.json(); })
     .then(function(data) { renderServiceTable(data); })
@@ -3843,6 +4053,47 @@ function renderHilbert(data) {
     lx += ctx.measureText(label).width + 20;
   });
 }
+
+function toggleSettings() {
+  var panel = document.getElementById('settings-panel');
+  panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+}
+
+function applySettings() {
+  if (!network) return;
+  var physics = document.getElementById('set-physics').checked;
+  var nodeSize = parseFloat(document.getElementById('set-node-size').value);
+  var labels = document.getElementById('set-labels').value;
+  var physOpts = physics ? { enabled: true, stabilization: { iterations: 50 } } : { enabled: false };
+  var nodes = network.body.data.nodes.get();
+  var defaultSizes = {};
+  allNodes.forEach(function(n) { defaultSizes[n.id] = n.size || 25; });
+  nodes.forEach(function(n) {
+    var baseSize = defaultSizes[n.id] || 25;
+    network.body.data.nodes.update({ id: n.id, size: baseSize * nodeSize });
+  });
+  var fontOpts = {};
+  if (labels === 'none') fontOpts = { size: 0 };
+  else if (labels === 'hover') fontOpts = { size: 14 };
+  else fontOpts = { size: 14 };
+  network.setOptions({ physics: physOpts, nodes: { font: fontOpts } });
+}
+
+function resetSettings() {
+  document.getElementById('set-physics').checked = true;
+  document.getElementById('set-node-size').value = 1;
+  document.getElementById('size-val').textContent = '1x';
+  document.getElementById('set-labels').value = 'always';
+  applySettings();
+}
+
+document.addEventListener('click', function(e) {
+  var panel = document.getElementById('settings-panel');
+  var btn = document.getElementById('btn-settings');
+  if (panel && btn && panel.style.display === 'block' && !panel.contains(e.target) && e.target !== btn) {
+    panel.style.display = 'none';
+  }
+});
 </script>
 
 <!-- Dependencies via CDN -->
@@ -3850,5 +4101,30 @@ function renderHilbert(data) {
 <script src="https://unpkg.com/vis-network@9.1.6/dist/vis-network.min.js"></script>
 <script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
 <script src="https://unpkg.com/3d-force-graph@1.73.5/dist/3d-force-graph.min.js"></script>
+<div id="settings-panel" style="display:none;position:absolute;top:86px;right:10px;width:280px;background:var(--panel-bg);border:1px solid var(--border);border-radius:8px;padding:16px;z-index:1000;backdrop-filter:blur(12px);box-shadow:0 8px 32px rgba(0,0,0,0.4);">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+    <span style="font-weight:600;color:var(--text);">⚙️ Настройки</span>
+    <button onclick="toggleSettings()" style="background:none;border:none;color:var(--text2);cursor:pointer;font-size:16px;">✕</button>
+  </div>
+  <div style="margin-bottom:12px;">
+    <label style="display:flex;align-items:center;gap:8px;color:var(--text);font-size:13px;cursor:pointer;">
+      <input type="checkbox" id="set-physics" onchange="applySettings()" checked>
+      <span>Физика (движение узлов)</span>
+    </label>
+  </div>
+  <div style="margin-bottom:12px;">
+    <label style="color:var(--text);font-size:13px;display:block;margin-bottom:4px;">Размер узлов: <span id="size-val">1x</span></label>
+    <input type="range" id="set-node-size" min="0.5" max="3" step="0.1" value="1" oninput="document.getElementById('size-val').textContent=this.value+'x';applySettings()" style="width:100%;accent-color:var(--accent);">
+  </div>
+  <div style="margin-bottom:12px;">
+    <label style="color:var(--text);font-size:13px;display:block;margin-bottom:4px;">Метки узлов</label>
+    <select id="set-labels" onchange="applySettings()" style="width:100%;padding:6px;background:var(--bg3);border:1px solid var(--border);color:var(--text);border-radius:4px;">
+      <option value="always">Всегда</option>
+      <option value="hover">При наведении</option>
+      <option value="none">Никогда</option>
+    </select>
+  </div>
+  <button onclick="resetSettings()" style="width:100%;padding:8px;background:var(--bg3);border:1px solid var(--border);color:var(--text);border-radius:4px;cursor:pointer;font-size:13px;">🔄 Сбросить настройки</button>
+</div>
 </body>
 </html>

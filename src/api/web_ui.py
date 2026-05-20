@@ -70,7 +70,7 @@ def build_data(analyzer: FirewallAnalyzer):
     nodes_data = []
     for node, data in analyzer.graph.nodes(data=True):
         endpoint_type = data.get('endpoint_type', 'unknown')
-        zone = data.get('zone', 'Unknown Zone')
+        zone = data.get('zone') or 'Unknown Zone'
         color_map = {
             'zone': '#90EE90', 'subnet': '#FFFACD', 'host': '#FFB6C1',
             'group': '#87CEEB', 'unknown': '#D3D3D3'
@@ -89,6 +89,7 @@ def build_data(analyzer: FirewallAnalyzer):
     for src, dst, data in analyzer.graph.edges(data=True):
         risk = data.get('risk_score', 0)
         rule_names = data.get('rules', [])
+        services = data.get('services', [])
         if risk >= 8:
             color = 'red'
             width = 4
@@ -109,7 +110,8 @@ def build_data(analyzer: FirewallAnalyzer):
             'color': color,
             'width': width,
             'risk': risk,
-            'title': edge_title
+            'title': edge_title,
+            'service': ', '.join(services) if services else '',
         })
 
     rules_data = []
@@ -137,7 +139,7 @@ def build_data(analyzer: FirewallAnalyzer):
         pass
 
     zones = sorted(set(
-        data.get('zone', 'Unknown Zone') for node, data in analyzer.graph.nodes(data=True)
+        data.get('zone') or 'Unknown Zone' for node, data in analyzer.graph.nodes(data=True)
     ))
 
     stats = {
