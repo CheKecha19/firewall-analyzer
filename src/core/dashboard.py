@@ -99,6 +99,7 @@ def get_dashboard_data(
     compliance_data: Optional[Dict] = None,
     temporal_data: Optional[List[Dict]] = None,
     config_diffs: Optional[List[Dict]] = None,
+    attack_graph_data: Optional[Dict] = None,
 ) -> DashboardData:
     """
     Aggregate all available data into a dashboard structure.
@@ -135,6 +136,18 @@ def get_dashboard_data(
     if prev_score is not None:
         score_trend = round(security_score - prev_score, 1)
 
+    # ── Attack Surface KPI ─────────────────────
+    attack_surface_kpi = {"value": 0, "display": "—"}
+    if attack_graph_data:
+        ext_sources = attack_graph_data.get("external_sources", [])
+        attack_paths = attack_graph_data.get("attack_paths", [])
+        reachable = attack_graph_data.get("reachable_targets", 0)
+        attack_surface_kpi["value"] = len(ext_sources)
+        if reachable > 0:
+            attack_surface_kpi["display"] = f"{reachable} reachable"
+        elif ext_sources:
+            attack_surface_kpi["display"] = f"{len(ext_sources)} exposed"
+
     kpis = [
         KPI(name="security_score", value=security_score, label="Security Score",
             trend=score_trend,
@@ -148,6 +161,9 @@ def get_dashboard_data(
             trend=None, trend_display="—", icon="✅"),
         KPI(name="zone_count", value=zone_count, label="Security Zones",
             trend=None, trend_display="—", icon="🏢"),
+        KPI(name="attack_surface", value=attack_surface_kpi.get("value", 0),
+            label="Attack Surface",
+            trend=None, trend_display=attack_surface_kpi.get("display", "—"), icon="⚔️"),
     ]
 
     # ── Top-10 Risks ───────────────────────────
@@ -240,12 +256,14 @@ def get_dashboard_json(
     compliance_data: Optional[Dict] = None,
     temporal_data: Optional[List[Dict]] = None,
     config_diffs: Optional[List[Dict]] = None,
+    attack_graph_data: Optional[Dict] = None,
 ) -> Dict:
     """Return dashboard data as JSON-serializable dict."""
     data = get_dashboard_data(
         issues=issues, rules=rules, graph_stats=graph_stats,
         zones=zones, quality_data=quality_data, compliance_data=compliance_data,
         temporal_data=temporal_data, config_diffs=config_diffs,
+        attack_graph_data=attack_graph_data,
     )
     return {
         "kpis": [{

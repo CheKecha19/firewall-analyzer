@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Force Graph — Firewall Analyzer Test</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #0a0a1a;
+            overflow: hidden;
+            color: #ccc;
+        }
+        #header {
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            background: linear-gradient(135deg, rgba(102, 126, 234, 0.9), rgba(118, 75, 162, 0.9));
+            padding: 12px 20px;
+            z-index: 10;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            backdrop-filter: blur(10px);
+        }
+        #header h1 { font-size: 20px; font-weight: 300; color: white; }
+        #header p { font-size: 12px; opacity: 0.8; color: white; }
+        #stats {
+            position: absolute;
+            top: 70px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 15px;
+            border-radius: 8px;
+            z-index: 10;
+            font-size: 13px;
+            line-height: 1.6;
+            min-width: 200px;
+        }
+        #stats strong { color: #667eea; }
+        #legend {
+            position: absolute;
+            bottom: 30px;
+            right: 30px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 15px;
+            border-radius: 8px;
+            z-index: 10;
+            font-size: 12px;
+            line-height: 1.6;
+        }
+        #legend h4 { margin-bottom: 8px; color: #667eea; }
+        .legend-row { display: flex; align-items: center; margin: 3px 0; }
+        .legend-dot { width: 12px; height: 12px; border-radius: 50%; margin-right: 8px; }
+        #controls {
+            position: absolute;
+            bottom: 30px;
+            left: 30px;
+            z-index: 10;
+            display: flex;
+            gap: 8px;
+        }
+        #controls button {
+            padding: 8px 16px;
+            border: 1px solid rgba(255,255,255,0.2);
+            background: rgba(0,0,0,0.6);
+            color: #ccc;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.2s;
+        }
+        #controls button:hover {
+            background: rgba(102, 126, 234, 0.4);
+            border-color: #667eea;
+        }
+        #controls button.active {
+            background: #667eea;
+            color: white;
+            border-color: #667eea;
+        }
+        #graph-container {
+            width: 100vw;
+            height: 100vh;
+        }
+        .tooltip {
+            position: absolute;
+            pointer-events: none;
+            background: rgba(0, 0, 0, 0.85);
+            color: white;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 13px;
+            z-index: 100;
+            display: none;
+            white-space: nowrap;
+        }
+    </style>
+</head>
+<body>
+    <div id="header">
+        <div>
+            <h1>🔥 3D Firewall Topology Test</h1>
+            <p>3d-force-graph library · OrbitControls · 100 random nodes</p>
+        </div>
+        <div>
+            <span style="opacity:0.7;font-size:12px">Mouse: drag rotate · scroll zoom · right-drag pan</span>
+        </div>
+    </div>
+
+    <div id="stats">
+        <div><strong>Nodes:</strong> <span id="stat-nodes">100</span></div>
+        <div><strong>Edges:</strong> <span id="stat-edges">0</span></div>
+        <div><strong>Groups:</strong> <span id="stat-groups">0</span></div>
+        <div style="margin-top:8px;font-size:11px;color:#888">Click node for details</div>
+    </div>
+
+    <div id="legend">
+        <h4>Node Groups</h4>
+        <div id="legend-content"></div>
+    </div>
+
+    <div id="controls">
+        <button id="btn-fit" onclick="fitGraph()">📐 Fit View</button>
+        <button id="btn-pause" onclick="toggleAnimation()">⏯️ Pause</button>
+        <button id="btn-colormode" onclick="cycleColorMode()">🎨 <span id="color-mode-label">By Group</span></button>
+    </div>
+
+    <div id="graph-container"></div>
+    <div id="tooltip" class="tooltip"></div>
+
+    <script src="https://cdn.jsdelivr.net/npm/3d-force-graph@1.80.0/dist/3d-force-graph.min.js"></script>
+    <script>
+    // ── Group definitions ──
+    const GROUPS = [
+        { name: 'Production', color: '#4CAF50' },
+        { name: 'DMZ', color: '#FF9800' },
+        { name: 'Internal', color: '#2196F3' },
+        { name: 'External', color: '#F44336' },
+        { name: 'Management', color: '#9C27B0' },
+        { name: 'Development', color: '#00BCD4' },
+        { name: 'Storage', color: '#795548' },
+        { name: 'Monitoring', color: '#607D8B' }
+    ];
+
+    // ── Risk level thresholds ──
+    function getRiskLabel(score) {
+        if (score >= 8) return 'Critical';
+        if (score >= 6) return 'High';
+        if (score >= 4) return 'Medium';
+        if (score >= 2) return 'Low';
+        return 'Info';
+    }
+
+    function getRiskColor(score) {
+        if (score >= 8) return '#FF0000';
+        if (score >= 6) return '#FF4500';
+        if (score >= 4) return '#FFD700';
+        if (score >= 2) return '#ADFF2F';
+        return '#00FF00';
+    }
+
+    // ── Generate test data ──
+    const NODES_COUNT = 100;
+
+    const gData = {
+        nodes: [],
+        links: []
+    };
+
+    // Create nodes
+    const nodeIds = [];
+    for (let i = 0; i < NODES_COUNT; i++) {
+        const ip = `10.${Math.floor(Math.random() * 256)}.${Math.floor(Math.random() * 256)}.${Math.floor(Math.random() * 254) + 1}`;
+        const group = GROUPS[Math.floor(Math.random() * GROUPS.length)];
+        const risk_score = Math.floor(Math.random() * 11); // 0-10
+
+        gData.nodes.push({
+            id: `node_${i}`,
+            label: ip,
+            group: group.name,
+            groupColor: group.color,
+            risk_score: risk_score,
+            risk_label: getRiskLabel(risk_score),
+            type: ['server', 'workstation', 'router', 'switch', 'firewall'][Math.floor(Math.random() * 5)]
+        });
+        nodeIds.push(`node_${i}`);
+    }
+
+    // Create edges (each node connects to 1-4 random others, ~250 edges)
+    const edgeSet = new Set();
+    for (let i = 0; i < NODES_COUNT; i++) {
+        const numEdges = 1 + Math.floor(Math.random() * 4);
+        for (let j = 0; j < numEdges; j++) {
+            const target = Math.floor(Math.random() * NODES_COUNT);
+            if (target === i) continue;
+            const key = `${Math.min(i, target)}_${Math.max(i, target)}`;
+            if (edgeSet.has(key)) continue;
+            edgeSet.add(key);
+
+            const riskScore = Math.floor(Math.random() * 11);
+
+            gData.links.push({
+                source: `node_${i}`,
+                target: `node_${target}`,
+                riskScore: riskScore,
+                riskLabel: getRiskLabel(riskScore)
+            });
+        }
+    }
+
+    // ── Initialize Graph ──
+    const container = document.getElementById('graph-container');
+    const Graph = new ForceGraph3D(container, { controlType: 'orbit' });
+
+    // Data binding
+    Graph
+        .graphData(gData)
+        .nodeId('id')
+        .nodeLabel(node => `
+            <div style="padding:4px 8px">
+                <b>${node.label}</b><br>
+                <span style="color:#aaa">Group:</span> ${node.group}<br>
+                <span style="color:#aaa">Type:</span> ${node.type}<br>
+                <span style="color:${getRiskColor(node.risk_score)}">Risk: ${node.risk_score}/10 (${node.risk_label})</span>
+            </div>
+        `)
+        .nodeVal(node => Math.max(1, node.risk_score + 1))
+        .nodeColor(node => node.groupColor)
+        .nodeResolution(16)
+        .nodeOpacity(0.8)
+        .linkColor(link => getRiskColor(link.riskScore))
+        .linkWidth(link => Math.max(0.5, (link.riskScore || 0) / 3))
+        .linkOpacity(0.3)
+        .linkDirectionalArrowLength(link => link.riskScore >= 7 ? 4 : 0)
+        .linkDirectionalArrowColor(link => getRiskColor(link.riskScore))
+        .linkDirectionalParticles(link => link.riskScore >= 8 ? 2 : 0)
+        .linkDirectionalParticleSpeed(0.01)
+        .backgroundColor('#0a0a1a')
+        .showNavInfo(true);
+
+    // ── Click handler ──
+    Graph.onNodeClick(node => {
+        const dist = Graph.cameraPosition();
+        const targetPos = { x: node.x || 0, y: node.y || 0, z: node.z || 0 };
+        // Smooth camera move to node
+        Graph.cameraPosition(
+            { x: targetPos.x + 50, y: targetPos.y + 30, z: targetPos.z + 80 },
+            targetPos,
+            1500
+        );
+        updateStatsHighlight(node);
+    });
+
+    Graph.onLinkClick(link => {
+        console.log('Link clicked:', link);
+    });
+
+    // ── Color modes ──
+    let colorMode = 'group'; // 'group' | 'risk'
+
+    function applyColorMode() {
+        if (colorMode === 'group') {
+            Graph.nodeColor(node => node.groupColor);
+        } else {
+            Graph.nodeColor(node => getRiskColor(node.risk_score));
+        }
+        document.getElementById('color-mode-label').textContent = colorMode === 'group' ? 'By Group' : 'By Risk';
+    }
+
+    function cycleColorMode() {
+        colorMode = colorMode === 'group' ? 'risk' : 'group';
+        applyColorMode();
+    }
+
+    // ── Animation toggle ──
+    let animating = true;
+    function toggleAnimation() {
+        animating = !animating;
+        if (animating) {
+            Graph.resumeAnimation();
+            document.getElementById('btn-pause').textContent = '⏯️ Pause';
+        } else {
+            Graph.pauseAnimation();
+            document.getElementById('btn-pause').textContent = '▶️ Resume';
+        }
+    }
+
+    // ── Fit view ──
+    function fitGraph() {
+        Graph.zoomToFit(400, 100);
+    }
+
+    // ── Stats ──
+    function updateStats() {
+        document.getElementById('stat-nodes').textContent = gData.nodes.length;
+        document.getElementById('stat-edges').textContent = gData.links.length;
+        const groupSet = new Set(gData.nodes.map(n => n.group));
+        document.getElementById('stat-groups').textContent = groupSet.size;
+    }
+
+    function updateStatsHighlight(node) {
+        document.getElementById('stat-nodes').innerHTML = `${gData.nodes.length} <span style="color:#667eea">(selected: ${node.label})</span>`;
+    }
+
+    // ── Legend ──
+    function buildLegend() {
+        let html = '';
+        GROUPS.forEach(g => {
+            html += `<div class="legend-row">
+                <span class="legend-dot" style="background:${g.color}"></span> ${g.name}
+            </div>`;
+        });
+        document.getElementById('legend-content').innerHTML = html;
+    }
+
+    // ── Init ──
+    updateStats();
+    buildLegend();
+    applyColorMode();
+
+    // Auto-fit after stabilization
+    setTimeout(() => fitGraph(), 3000);
+
+    console.log(`%c🚀 3D Firewall Graph Ready %c| %c${gData.nodes.length} nodes %c· %c${gData.links.length} edges`,
+        'color:#667eea;font-size:14px', '', 'color:#4CAF50', '', 'color:#FF9800');
+    console.log('%cLibrary: 3d-force-graph v1.80.0 (Three.js + d3-force-3d)', 'color:#888');
+    console.log('%cControls: Orbit (left-drag rotate, scroll zoom, right-drag pan)', 'color:#888');
+    </script>
+</body>
+</html>

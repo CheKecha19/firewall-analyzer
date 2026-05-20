@@ -19,6 +19,20 @@ from ..models.rule import FirewallRule
 EXTERNAL_ZONES = {'internet', 'external', 'untrusted', 'wan', 'public'}
 CRITICAL_ZONES = {'management', 'critical', 'trusted'}
 
+# Имена узлов, которые всегда считаются внешними (независимо от zone-атрибута)
+EXTERNAL_NODE_NAMES = {
+    'internet', 'external', 'wan', 'public', 'outside', 'untrusted',
+    'internet_zone', 'internet zone',
+}
+
+# Имена узлов, которые считаются критическими (по названию)
+CRITICAL_NODE_KEYWORDS = {
+    'management', 'admin', 'critical', 'trusted', 'secure',
+    'dc', 'domain controller', 'ad', 'active directory',
+    'db', 'database', 'sql',
+    'bastion', 'jump',
+}
+
 # Критические порты/сервисы, повышающие ценность цели
 CRITICAL_PORTS = {
     22: 'SSH', 3389: 'RDP', 53: 'DNS', 88: 'Kerberos', 389: 'LDAP',
@@ -169,33 +183,117 @@ class AttackGraphBuilder:
         self._critical_targets: List[str] = []
 
     def detect_external_sources(self) -> List[str]:
-        """Находит все external-facing узлы."""
+        """
+        Находит все external-facing узлы.
+
+        Использует несколько признаков:
+        1. Атрибут zone = external-зона (internet/external/untrusted/wan/public)
+        2. Имя узла совпадает с EXTERNAL_NODE_NAMES
+        3. CIDR 0.0.0.0/0 (весь интернет)
+        4. Узел типа 'zone' с external-зоной
+        """
         sources = []
         for node, data in self.graph.nodes(data=True):
+            node_name = str(node).strip().lower()
             zone = _normalize_zone(data.get('zone', ''))
-            if _is_external_zone(zone):
+            etype = data.get('endpoint_type', '').lower()
+            cidrs = data.get('cidrs', [])
+
+            # 1. Zone attribute
+            if zone and _is_external_zone(zone):
                 sources.append(str(node))
+                continue
+
+            # 2. Node name matches external keywords
+            if node_name in EXTERNAL_NODE_NAMES or any(
+                ext in node_name for ext in ('internet', 'external', 'wan', 'untrusted')
+            ):
+                sources.append(str(node))
+                continue
+
+            # 3. CIDR 0.0.0.0/0
+            if any(str(c).strip() == '0.0.0.0/0' for c in cidrs):
+                sources.append(str(node))
+                continue
+
+            # 4. Zone-type node in external zone (checked above, but fallback)
+            if etype == 'zone' and _is_external_zone(node_name):
+                sources.append(str(node))
+                continue
+
         self._external_sources = sources
         return sources
 
     def detect_critical_assets(self) -> List[str]:
-        """Находит критические активы (зоны + порты)."""
+        """
+        Находит критические активы (зоны + порты + имена).
+
+        Использует несколько признаков:
+        1. Атрибут zone = critical-зона (management/critical/trusted)
+        2. Имя узла содержит critical-ключевые слова (dc, db, management, etc.)
+        3. Критические порты (SSH, RDP, DB-порты и т.д.)
+        4. Узел типа 'zone' с critical-зоной
+        5. Узел, в который приходит много входящих рёбер (хаб) — потенциально критический
+        """
         targets = []
+        already_targeted: Set[str] = set()
+
         for node, data in self.graph.nodes(data=True):
+            node_name = str(node).strip().lower()
             zone = _normalize_zone(data.get('zone', ''))
+            etype = data.get('endpoint_type', '').lower()
             ports = data.get('ports', set())
             if isinstance(ports, list):
                 ports = set(ports)
+
             level = _port_criticality_level(ports)
-            if _is_critical_zone(zone) or level in ('critical', 'high'):
+            is_critical = False
+
+            # 1. Zone attribute
+            if zone and _is_critical_zone(zone):
+                is_critical = True
+
+            # 2. Node name keywords
+            if not is_critical:
+                for kw in CRITICAL_NODE_KEYWORDS:
+                    if kw in node_name:
+                        is_critical = True
+                        break
+
+            # 3. Critical ports
+            if not is_critical and level in ('critical', 'high'):
+                is_critical = True
+
+            # 4. Zone-type node
+            if not is_critical and etype == 'zone' and _is_critical_zone(node_name):
+                is_critical = True
+
+            if is_critical and str(node) not in already_targeted:
                 targets.append(str(node))
+                already_targeted.add(str(node))
+
+        # 5. Fallback: nodes reachable from external sources become targets
+        #    (any node connected to or from external sources is interesting)
+        if not targets:
+            # Nodes with high in-degree (multiple inbound connections) = likely servers
+            in_degrees = {}
+            for _, dst in self.graph.edges():
+                in_degrees[dst] = in_degrees.get(dst, 0) + 1
+            if in_degrees:
+                sorted_by_in = sorted(in_degrees.items(), key=lambda x: -x[1])
+                threshold = max(2, sorted_by_in[0][1] // 2) if sorted_by_in else 2
+                for node_str, deg in sorted_by_in:
+                    if deg >= threshold and str(node_str) not in already_targeted:
+                        targets.append(str(node_str))
+                        already_targeted.add(str(node_str))
+
         self._critical_targets = targets
         return targets
 
-    def _edge_allowed(self, src: str, dst: str) -> Tuple[bool, Optional[str], int]:
+    def _edge_allowed(self, src: str, dst: str) -> Tuple[bool, Optional[str], int, str]:
         """
         Проверяет, разрешён ли переход src→dst по ACL.
-        Возвращает (allowed, rule_name, risk).
+        Возвращает (allowed, rule_name, risk, service_info).
         """
         key = (src, dst)
         entries = self.acl.get(key, [])
@@ -206,14 +304,18 @@ class AttackGraphBuilder:
                 risk = edge_data.get('risk_score', 3)
                 rules_list = edge_data.get('rules', [])
                 rule_name = rules_list[0] if rules_list else None
-                return True, rule_name, risk
-            return False, None, 0
+                services = edge_data.get('services', [])
+                service_info = ', '.join(services[:3]) if services else ''
+                return True, rule_name, risk, service_info
+            return False, None, 0, ''
 
         # Ищем разрешающее правило (первое подходящее)
         for entry in entries:
             if entry['action'] in ('accept', 'permit', 'allow'):
-                return True, entry['rule'], entry['risk']
-        return False, None, 0
+                svc_ports = entry.get('services', set())
+                svc_info = ', '.join(str(p) for p in list(svc_ports)[:3]) if svc_ports else ''
+                return True, entry['rule'], entry['risk'], svc_info
+        return False, None, 0, ''
 
     def _estimate_hop_risk(self, src: str, dst: str) -> int:
         """Оценивает риск одного хопа на основе данных графа."""
@@ -233,41 +335,46 @@ class AttackGraphBuilder:
 
     def _bfs_attack_paths(self, max_hops: int = MAX_HOPS) -> List[AttackPath]:
         """
-        BFS от каждого external источника ко всем критическим целям.
+        BFS от каждого external источника ко всем достижимым узлам.
+        Все достижимые узлы считаются потенциальными целями.
         Возвращает все найденные пути длиной ≤ max_hops.
         """
         paths: List[AttackPath] = []
         sources = self._external_sources or self.detect_external_sources()
-        targets = set(self._critical_targets or self.detect_critical_assets())
+        critical_set = set(self._critical_targets or self.detect_critical_assets())
 
-        if not sources or not targets:
+        if not sources:
+            return paths
+
+        # Все узлы, кроме самих external источников — потенциальные цели
+        all_nodes = set(self.graph.nodes()) | {k[0] for k in self.acl} | {k[1] for k in self.acl}
+        all_targets = all_nodes - set(sources)
+
+        if not all_targets:
             return paths
 
         for source in sources:
-            # BFS queue: (current_node, path_hops)
+            # BFS queue
             queue: deque = deque()
             visited: Set[str] = {source}
-            # parent_map: child -> (parent, rule, risk)
-            parent_map: Dict[str, Tuple[str, Optional[str], int]] = {}
+            parent_map: Dict[str, Tuple[str, Optional[str], int, str]] = {}
+            depth_map: Dict[str, int] = {source: 0}
 
             queue.append(source)
 
-            found_targets: Set[str] = set()
-
             while queue:
                 current = queue.popleft()
+                current_depth = depth_map.get(current, 0)
 
-                # Проверяем, достигли ли цели
-                if current in targets and current != source:
-                    found_targets.add(current)
+                # Don't go beyond max hops
+                if current_depth >= max_hops:
+                    continue
 
-                # Получаем соседей
+                # Get neighbors
                 neighbors = set()
-                # Из графа
                 if self.graph.has_node(current):
                     for _, dst in self.graph.out_edges(current):
                         neighbors.add(dst)
-                # Из ACL
                 for (s, d) in self.acl:
                     if s == current:
                         neighbors.add(d)
@@ -275,39 +382,58 @@ class AttackGraphBuilder:
                 for neighbor in neighbors:
                     if neighbor in visited:
                         continue
-                    allowed, rule_name, risk = self._edge_allowed(current, neighbor)
+                    allowed, rule_name, risk, svc_info = self._edge_allowed(current, neighbor)
                     if not allowed:
                         continue
                     visited.add(neighbor)
-                    parent_map[neighbor] = (current, rule_name, risk)
+                    parent_map[neighbor] = (current, rule_name, risk, svc_info)
+                    depth_map[neighbor] = current_depth + 1
                     queue.append(neighbor)
 
-            # Восстанавливаем пути для найденных целей
-            for target in found_targets:
+            # Build paths to all reachable targets
+            for target in all_targets & visited:
+                if target == source:
+                    continue
                 path = self._reconstruct_path(source, target, parent_map)
-                if path and len(path.hops) <= max_hops + 1:  # +1 потому что включаем source
+                if path and len(path.hops) <= max_hops + 1:
+                    # Mark whether the target is critical
+                    path.risk_score += (3 if target in critical_set else 0)
                     paths.append(path)
+
+        # Sort: critical targets first, then by risk score
+        paths.sort(key=lambda p: (
+            0 if p.target in critical_set else 1,
+            -p.risk_score
+        ))
 
         return paths
 
     def _reconstruct_path(self, source: str, target: str,
-                          parent_map: Dict[str, Tuple[str, Optional[str], int]]) -> Optional[AttackPath]:
+                          parent_map: Dict[str, Tuple[str, Optional[str], int, str]]) -> Optional[AttackPath]:
         """Восстанавливает путь от source к target по parent_map."""
         hops: List[AttackHop] = []
         current = target
         total_risk = 0
+        services_along_path: List[str] = []
 
         while current != source:
             if current not in parent_map:
                 return None
-            parent, rule, risk = parent_map[current]
+            parent, rule, risk, svc_info = parent_map[current]
             hop_risk = risk if risk else self._estimate_hop_risk(parent, current)
+            hop_label = f"{current}"
+            if svc_info:
+                hop_label = f"{current} [{svc_info}]"
+            if rule:
+                hop_label = f"{current} [{rule}]"
             hops.append(AttackHop(
-                node=current,
+                node=hop_label,
                 rule=rule,
                 risk=hop_risk,
             ))
             total_risk += hop_risk
+            if svc_info:
+                services_along_path.append(svc_info)
             current = parent
 
         # Добавляем source как первый хоп

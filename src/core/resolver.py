@@ -145,6 +145,13 @@ class ObjectResolver:
                 result = self._resolve_zone(obj_id)
             elif obj_id in self._network_groups:
                 result = self._resolve_network_group(obj_id)
+            elif obj_id in self._ip_lists:
+                result = self._resolve_ip_list(obj_id)
+            elif obj_id in self._address_ranges:
+                result = self._resolve_address_range(obj_id)
+            else:
+                # Пробуем как IP
+                result = self._resolve_as_ip(obj_id)
         
         elif obj_type == 'service':
             if obj_id in self._service_groups:

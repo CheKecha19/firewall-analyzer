@@ -481,10 +481,21 @@ async def get_dashboard():
     except Exception:
         pass
 
+    # Get attack graph data for dashboard
+    attack_graph_data = None
+    if analyzer and analyzer.graph and analyzer.graph.number_of_nodes() > 0:
+        try:
+            from src.core.attack_graph import AttackGraphBuilder
+            builder = AttackGraphBuilder(analyzer.graph, analyzer.rules)
+            attack_graph_data = builder.to_dict()
+        except Exception:
+            pass
+
     result = get_dashboard_json(
         issues=issues, rules=rules, graph_stats=stats,
         zones=zones, quality_data=quality_data,
         temporal_data=temporal_data,
+        attack_graph_data=attack_graph_data,
     )
     return JSONResponse(result)
 

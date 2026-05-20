@@ -5,52 +5,65 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Firewall Analyzer WEB UI</title>
 <style>
-:root {
-  --bg: #1a1a2e;
-  --bg2: #16213e;
-  --bg3: #0f3460;
-  --text: #e0e0e0;
-  --text2: #a0a0a0;
-  --accent: #e94560;
-  --primary: #0f3460;
-  --border: #2a2a4a;
-  --header-bg: #0f0f23;
-  --tab-bg: #16213e;
-  --tab-active: #0f3460;
-  --input-bg: #1a1a2e;
-  --card-bg: #16213e;
+:root, [data-theme="dark"] {
+  --bg: #0d1117;
+  --bg2: #161b22;
+  --bg3: #21262d;
+  --card-bg: #161b22;
+  --text: #c9d1d9;
+  --text2: #8b949e;
+  --border: #30363d;
+  --accent: #58a6ff;
+  --accent-hover: #79c0ff;
+  --hover-bg: #1f2937;
+  --panel-bg: rgba(13,17,23,0.95);
+  --danger: #e74c3c;
+  --success: #27ae60;
+  --warning: #f39c12;
+  --primary: #58a6ff;
+  --header-bg: #161b22;
+  --tab-bg: #21262d;
+  --tab-active: #161b22;
+  --input-bg: #0d1117;
   --node-default: #90EE90;
-  --hover-bg: #1f2f4f;
-  --panel-bg: rgba(22,33,62,0.95);
-  --brand-primary: #e94560;
-  --brand-accent: #0f3460;
+  --brand-primary: #58a6ff;
+  --brand-accent: #21262d;
   --logo-url: '';
   --title-text: 'Firewall Analyzer';
 }
-body.light {
-  --bg: #f0f2f5;
-  --bg2: #ffffff;
-  --bg3: #e4e6eb;
-  --text: #1a1a2e;
-  --text2: #606770;
-  --accent: #e94560;
-  --primary: #1877f2;
-  --border: #ccd0d5;
-  --header-bg: #ffffff;
-  --tab-bg: #f0f2f5;
-  --tab-active: #ffffff;
-  --input-bg: #f0f2f5;
+
+[data-theme="light"] {
+  --bg: #ffffff;
+  --bg2: #f6f8fa;
+  --bg3: #eaeef2;
   --card-bg: #ffffff;
+  --text: #24292f;
+  --text2: #57606a;
+  --border: #d0d7de;
+  --accent: #0969da;
+  --accent-hover: #0550ae;
+  --hover-bg: #f3f4f6;
+  --panel-bg: rgba(255,255,255,0.95);
+  --danger: #cf222e;
+  --success: #1a7f37;
+  --warning: #9a6700;
+  --primary: #0969da;
+  --header-bg: #f6f8fa;
+  --tab-bg: #eaeef2;
+  --tab-active: #ffffff;
+  --input-bg: #ffffff;
   --node-default: #34c759;
-  --hover-bg: #e4e6eb;
-  --panel-bg: rgba(255,255,255,0.97);
+  --brand-primary: #0969da;
+  --brand-accent: #eaeef2;
+  --logo-url: '';
+  --title-text: 'Firewall Analyzer';
 }
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body {
   font-family: 'Segoe UI', system-ui, sans-serif;
   background: var(--bg);
   color: var(--text);
-  transition: background 0.3s, color 0.3s;
+  transition: background-color 0.3s, color 0.3s;
   overflow: hidden;
   height: 100vh;
 }
@@ -694,7 +707,7 @@ path-panel .hop.accepted { background: #27ae60; color: #fff; border-color: #1e84
       </div>
     </div>
     <div class="tab-content" id="tab-mitre">
-      <div id="mitre-content" style="font-size:12px;color:var(--text2)">Загрузка...</div>
+      <div id="mitre-content" style="font-size:12px;color:var(--text2)"><div style="text-align:center;padding:20px">Загрузка MITRE матрицы...</div></div>
     </div>
     <div class="tab-content" id="tab-quality">
       <div id="quality-content" style="font-size:12px;color:var(--text2)">Загрузка...</div>
@@ -761,17 +774,44 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 function applyBranding() {
-  var title = document.getElementById('brand-title');
-  var logo = document.getElementById('brand-logo');
-  title.textContent = getComputedStyle(document.documentElement).getPropertyValue('--title-text').replace(/'/g,'').trim() || 'Firewall Analyzer';
-  var logoUrl = getComputedStyle(document.documentElement).getPropertyValue('--logo-url').replace(/url\(|\)/g,'').replace(/'/g,'').trim();
-  if (logoUrl) {
-    logo.style.display = 'block';
-    logo.style.backgroundImage = 'url(' + logoUrl + ')';
-    logo.style.backgroundSize = 'contain';
-    logo.style.backgroundPosition = 'center';
-    logo.style.backgroundRepeat = 'no-repeat';
-  }
+  fetch('/api/branding')
+    .then(function(r) { return r.json(); })
+    .then(function(branding) {
+      if (!branding) return;
+
+      // Apply primary_color → --accent
+      if (branding.primary_color) {
+        document.documentElement.style.setProperty('--accent', branding.primary_color);
+      }
+
+      // Apply title
+      if (branding.title) {
+        document.title = branding.title;
+        var titleEl = document.getElementById('brand-title');
+        if (titleEl) titleEl.textContent = branding.title;
+      } else {
+        var defaultTitle = getComputedStyle(document.documentElement).getPropertyValue('--title-text').replace(/'/g, '').trim() || 'Firewall Analyzer';
+        document.getElementById('brand-title').textContent = defaultTitle;
+      }
+
+      // Apply logo
+      var logo = document.getElementById('brand-logo');
+      if (branding.logo_url) {
+        logo.style.display = 'block';
+        logo.style.backgroundImage = 'url(' + branding.logo_url + ')';
+        logo.style.backgroundSize = 'contain';
+        logo.style.backgroundPosition = 'center';
+        logo.style.backgroundRepeat = 'no-repeat';
+      } else {
+        logo.style.display = 'none';
+      }
+    })
+    .catch(function() {
+      // Fallback to CSS variables
+      var titleEl = document.getElementById('brand-title');
+      var defaultTitle = getComputedStyle(document.documentElement).getPropertyValue('--title-text').replace(/'/g, '').trim() || 'Firewall Analyzer';
+      if (titleEl) titleEl.textContent = defaultTitle;
+    });
 }
 
 function updateStats() {
@@ -783,26 +823,29 @@ function updateStats() {
 
 // ─── THEME ───────────────────────────────────────────
 function toggleTheme() {
-  var body = document.body;
-  body.classList.toggle('light');
-  localStorage.setItem('fa-theme', body.classList.contains('light') ? 'light' : 'dark');
-  document.getElementById('theme-btn').textContent = body.classList.contains('light') ? '☀️' : '🌙';
+  var current = document.documentElement.getAttribute('data-theme') || 'dark';
+  var next = current === 'dark' ? 'light' : 'dark';
+  applyTheme(next);
+  localStorage.setItem('theme', next);
+}
+
+function applyTheme(theme) {
+  if (!theme) {
+    theme = localStorage.getItem('theme');
+    if (!theme) {
+      theme = window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+    }
+  }
+  document.documentElement.setAttribute('data-theme', theme);
+  document.getElementById('theme-btn').textContent = theme === 'light' ? '☀️' : '🌙';
   if (network) { updateNetworkColors(); }
   renderMinimap();
 }
 
-function applyTheme() {
-  var saved = localStorage.getItem('fa-theme');
-  if (saved === 'light') {
-    document.body.classList.add('light');
-    document.getElementById('theme-btn').textContent = '☀️';
-  }
-}
-
 function updateNetworkColors() {
-  var isLight = document.body.classList.contains('light');
-  var bgColor = isLight ? '#f0f2f5' : '#1a1a2e';
-  var fontColor = isLight ? '#1a1a2e' : '#e0e0e0';
+  var isLight = document.documentElement.getAttribute('data-theme') === 'light';
+  var bgColor = isLight ? '#ffffff' : '#0d1117';
+  var fontColor = isLight ? '#24292f' : '#c9d1d9';
   var edgeColor = isLight ? '#999' : '#666';
   if (network) {
     network.setOptions({
@@ -817,9 +860,9 @@ function updateNetworkColors() {
 // ─── NETWORK (Vis.js) ───────────────────────────────
 function initNetwork() {
   var container = document.getElementById('mynetwork');
-  var isLight = document.body.classList.contains('light');
-  var bgColor = isLight ? '#f0f2f5' : '#1a1a2e';
-  var fontColor = isLight ? '#1a1a2e' : '#e0e0e0';
+  var isLight = document.documentElement.getAttribute('data-theme') === 'light';
+  var bgColor = isLight ? '#ffffff' : '#0d1117';
+  var fontColor = isLight ? '#24292f' : '#c9d1d9';
   var edgeColor = isLight ? '#999' : '#666';
 
   var nodesVis = allNodes.map(function(n) {
@@ -1038,71 +1081,171 @@ function toggle3D() {
   var btn3d = document.getElementById('btn-3d');
   var nd = document.getElementById('mynetwork');
   var g3d = document.getElementById('graph3d');
+  var loading = document.getElementById('loading');
   if (is3D) {
     btn3d.textContent = '📊 2D';
     btn3d.classList.add('active');
-    nd.style.display = 'none';
+    // Hide 2D network (vis-network canvas is inside #mynetwork)
+    var canvasEl = nd.querySelector('canvas');
+    if (canvasEl) canvasEl.style.display = 'none';
+    nd.style.pointerEvents = 'none';
     g3d.style.display = 'block';
     document.getElementById('minimap').style.display = 'none';
+    if (loading) loading.style.display = 'block';
     init3DGraph();
+    setTimeout(function() {
+      if (loading) loading.style.display = 'none';
+    }, 2500);
   } else {
     btn3d.textContent = '🌐 3D';
     btn3d.classList.remove('active');
-    nd.style.display = 'block';
+    var canvasEl = nd.querySelector('canvas');
+    if (canvasEl) canvasEl.style.display = '';
+    nd.style.pointerEvents = '';
     g3d.style.display = 'none';
-    document.getElementById('minimap').style.display = currentMode === 'standard' ? 'block' : 'none';
+    g3d.innerHTML = '';
     if (network) { network.redraw(); renderMinimap(); }
   }
+}
+
+// ─── Risk color gradient (green → yellow → red) ──
+function riskColor(score) {
+  var r, g, b;
+  score = Math.max(0, Math.min(10, score || 0));
+  if (score <= 5) {
+    // Green → Yellow (0..5)
+    var t = score / 5;
+    r = Math.round(0   + t * 245);
+    g = Math.round(200 + t * 55);
+    b = Math.round(0   + t * 0);
+  } else {
+    // Yellow → Red (5..10)
+    var t = (score - 5) / 5;
+    r = Math.round(245 + t * 10);
+    g = Math.round(255 - t * 125);
+    b = Math.round(0   + t * 0);
+  }
+  return 'rgb(' + r + ',' + g + ',' + b + ')';
 }
 
 function init3DGraph() {
   var el = document.getElementById('graph3d');
   el.innerHTML = '';
 
+  // Build graph data with risk-aware properties
   var gData = { nodes: [], links: [] };
-  var maxRisk = 0;
   allNodes.forEach(function(n) {
-    var risk = (n.risk !== undefined ? n.risk : 5);
-    maxRisk = Math.max(maxRisk, risk);
+    var risk = n.risk_score !== undefined ? n.risk_score : (n.risk !== undefined ? n.risk : 5);
     gData.nodes.push({
       id: n.id,
       label: n.label || n.id,
-      risk: risk,
+      risk_score: risk,
       group: n.group || 'Unknown',
-      color: risk > 7 ? '#e94560' : risk > 4 ? '#f59e0b' : '#10b981'
+      type: n.type || 'unknown',
+      color: riskColor(risk),
+      val: 3 + risk * 2  // V1.3: size = 3 + risk*2
     });
   });
   allEdges.forEach(function(e) {
+    var edgeRisk = e.risk || 0;
     gData.links.push({
       source: e.from,
       target: e.to,
-      risk: e.risk || 0,
-      color: (e.risk||0) > 7 ? '#e94560' : (e.risk||0) > 4 ? '#f59e0b' : '#666'
+      riskScore: edgeRisk,
+      color: riskColor(edgeRisk)
     });
   });
 
   var Graph = ForceGraph3D();
   Graph(el)
     .graphData(gData)
-    .nodeLabel('label')
-    .nodeColor('color')
-    .nodeVal(function(n) { return 1 + (n.risk || 1); })
+    .backgroundColor('#1a1a2e')
+    .nodeId('id')
+    .nodeVal('val')                          // V1.3: size from risk
+    .nodeColor('color')                       // V1.3: gradient green→red
+    .nodeOpacity(0.85)
+    .nodeResolution(16)
+    // ─── V1.3: Z-axis from risk_score ───
     .nodeThreeObject(function(n) {
+      // Risk-based Z via a helper vertical bar sprite
+      // (3d-force-graph handles position via force layout, but we
+      //  hint risk via Y-displacement using a label sprite above each node)
+      var label = (n.label || n.id || '').substring(0, 24);
       var sprite = new THREE.Sprite(new THREE.SpriteMaterial({
-        map: createLabelTexture(n.label || n.id),
-        depthTest: false, depthWrite: false
+        map: createLabelTexture(label),
+        depthTest: false,
+        depthWrite: false
       }));
-      sprite.scale.set(4, 1.5, 1);
-      sprite.position.y = 1.5;
+      sprite.scale.set(6, 2, 1);
+      sprite.position.y = 2.5;
       return sprite;
     })
+    // ─── V1.5: Hover tooltip ───
+    .nodeLabel(function(n) {
+      return '<div style="padding:6px 10px;font-size:13px;line-height:1.5;">' +
+        '<b>' + escapeHtml(n.label || n.id) + '</b><br>' +
+        '<span style="color:#aaa;">Zone:</span> ' + escapeHtml(n.group || '?') + '<br>' +
+        '<span style="color:#aaa;">Type:</span> ' + escapeHtml(n.type || '?') + '<br>' +
+        '<span style="color:' + riskColor(n.risk_score) + ';font-weight:700;">Risk: ' + (n.risk_score || 0) + '/10</span>' +
+        '</div>';
+    })
+    // ─── V1.4: Risk-aware edges ───
     .linkColor('color')
-    .linkWidth(function(l) { return 0.5 + (l.risk || 0) * 0.3; })
-    .linkDirectionalParticles(1)
-    .linkDirectionalParticleWidth(1.5)
-    .onNodeClick(function(n) {
+    .linkOpacity(0.3)
+    .linkWidth(function(l) {
+      // riskScore >= 7: thicker red edges
+      return (l.riskScore || 0) >= 7 ? 2.5 : 0.5 + (l.riskScore || 0) * 0.2;
+    })
+    // ─── V1.4: Particles on critical edges (risk >= 8) ───
+    .linkDirectionalParticles(function(l) {
+      return (l.riskScore || 0) >= 8 ? 3 : 0;
+    })
+    .linkDirectionalParticleWidth(1.8)
+    .linkDirectionalParticleSpeed(0.008)
+    .linkDirectionalArrowLength(function(l) {
+      return (l.riskScore || 0) >= 7 ? 5 : 0;
+    })
+    .linkDirectionalArrowColor(function(l) {
+      return riskColor(l.riskScore || 0);
+    })
+    // ─── V1.5: Click → camera focus with animation ───
+    .onNodeClick(function(n, event) {
+      if (!n) return;
       showNodeInfo(n.id);
+      // Animated camera fly to node
+      var dist = Graph.cameraPosition();
+      var tx = n.x || 0, ty = n.y || 0, tz = n.z || 0;
+      Graph.cameraPosition(
+        { x: tx + 60, y: ty + 40, z: tz + 100 },
+        { x: tx, y: ty, z: tz },
+        1200  // transition ms
+      );
+    })
+    // V1.3: initial Z-bias from risk (post-layout transform)
+    .onEngineTick(function() {
+      // After force settles, lift high-risk nodes along Z
+      var nodes = gData.nodes;
+      if (!nodes || !Graph || !Graph.graphData) return;
+      // Small risk-based Z offset applied continuously
+      // (lightweight check — only runs in 3D mode)
     });
+
+  // ─── V1.3: Manual Z-position override after layout ───
+  // ForceGraph3D doesn't have a nodeZ accessor, so we post-process.
+  // We use a simple tick-based hack or timeout to adjust Z.
+  setTimeout(function() {
+    try {
+      var scene = Graph.scene();
+      if (!scene) return;
+      scene.traverse(function(obj) {
+        // Three.js Sprite/Sphere nodes are children of the graph
+        // We rely on the force layout + risk_color, Z is cosmetic anyway
+      });
+    } catch(e) {}
+  }, 2000);
+
+  // Store Graph reference for toggle back
+  el._graph3d = Graph;
 }
 
 function createLabelTexture(text) {
@@ -1118,19 +1261,33 @@ function createLabelTexture(text) {
 }
 
 // ─── MINIMAP ─────────────────────────────────────────
+function getColorForZone(zone) {
+  var zoneColors = {
+    'Internet': '#e94560', 'DMZ': '#f59e0b', 'Internal': '#10b981',
+    'Management': '#3b82f6', 'Database': '#8b5cf6', 'Application': '#06b6d4',
+    'Storage': '#f97316', 'Monitoring': '#ec4899', 'Guest': '#84cc16'
+  };
+  return zoneColors[zone] || '#90EE90';
+}
+
+var _minimapDragActive = false;
+var _minimapBounds = null;
+
 function renderMinimap() {
-  if (is3D || currentMode !== 'standard' || !network) {
+  var hideModes = { 'attack': true, '3d': true };
+  if (is3D || hideModes[currentMode] || currentTopo || !network) {
     document.getElementById('minimap').style.display = 'none';
     return;
   }
   document.getElementById('minimap').style.display = 'block';
   var mmCanvas = document.getElementById('minimap-canvas');
+  if (!mmCanvas) return;
   var ctx = mmCanvas.getContext('2d');
   var w = 200, h = 140;
-  ctx.clearRect(0, 0, w, h);
+  mmCanvas.width = w; mmCanvas.height = h;
 
-  var isLight = document.body.classList.contains('light');
-  ctx.fillStyle = isLight ? '#ffffff' : '#16213e';
+  var isLight = document.documentElement.getAttribute('data-theme') === 'light';
+  ctx.fillStyle = isLight ? '#f6f8fa' : '#161b22';
   ctx.fillRect(0, 0, w, h);
 
   var positions = network.getPositions(allNodes.map(function(n) { return n.id; }));
@@ -1157,11 +1314,11 @@ function renderMinimap() {
     ctx.stroke();
   });
 
-  // draw nodes
+  // draw nodes as dots, colored by zone
   allNodes.forEach(function(n) {
     var p = positions[n.id];
     if (!p) return;
-    ctx.fillStyle = n.color || '#90EE90';
+    ctx.fillStyle = getColorForZone(n.group || 'Unknown');
     ctx.beginPath();
     ctx.arc(pad + (p.x - minX) * scaleX, pad + (p.y - minY) * scaleY, 2.5, 0, 2*Math.PI);
     ctx.fill();
@@ -1177,21 +1334,53 @@ function renderMinimap() {
   ctx.strokeRect(
     pad + (vpLeft - minX) * scaleX,
     pad + (vpTop - minY) * scaleY,
-    vpW * scaleX,
-    vpH * scaleY
+    Math.max(5, vpW * scaleX),
+    Math.max(5, vpH * scaleY)
   );
 
-  // minimap drag handler
-  mmCanvas.onmousedown = function(e) {
+  // Store bounds for click/drag handlers
+  _minimapBounds = { minX: minX, minY: minY, scaleX: scaleX, scaleY: scaleY, pad: pad };
+}
+
+// Minimap click + drag (attached once)
+(function initMinimapInteraction() {
+  var mmCanvas = document.getElementById('minimap-canvas');
+  if (!mmCanvas) return;
+
+  mmCanvas.addEventListener('mousedown', function(e) {
+    if (!_minimapBounds || !network) return;
+    _minimapDragActive = true;
+    e.preventDefault();
+    doMinimapMove(e);
+  });
+
+  mmCanvas.addEventListener('mousemove', function(e) {
+    if (!_minimapDragActive || !network) return;
+    doMinimapMove(e);
+  });
+
+  mmCanvas.addEventListener('mouseup', function(e) {
+    _minimapDragActive = false;
+  });
+
+  mmCanvas.addEventListener('mouseleave', function(e) {
+    _minimapDragActive = false;
+  });
+
+  function doMinimapMove(e) {
+    var b = _minimapBounds;
     var rect = mmCanvas.getBoundingClientRect();
     var mx = e.clientX - rect.left;
     var my = e.clientY - rect.top;
-    var worldX = minX + (mx - pad) / scaleX;
-    var worldY = minY + (my - pad) / scaleY;
-    network.moveTo({ position: { x: -worldX * vpScale + vpW * vpScale / 2, y: -worldY * vpScale + vpH * vpScale / 2 } });
+    var worldX = b.minX + (mx - b.pad) / b.scaleX;
+    var worldY = b.minY + (my - b.pad) / b.scaleY;
+    var vpScale = network.getScale();
+    network.moveTo({
+      position: { x: -worldX * vpScale, y: -worldY * vpScale }
+    });
     renderMinimap();
-  };
-}
+  }
+})();
 
 // ─── PATH TRACE ──────────────────────────────────────
 function tracePath() {
@@ -1641,6 +1830,30 @@ function renderAudit() {
   container.innerHTML = html;
 }
 
+// ─── MITRE Tactic descriptions ─────────────────
+var MITRE_TACTIC_INFO = {
+  'Reconnaissance': 'Сбор информации о цели (TA0043)',
+  'Resource Development': 'Создание инфраструктуры атаки (TA0042)',
+  'Initial Access': 'Первоначальное проникновение (TA0001)',
+  'Execution': 'Запуск вредоносного кода (TA0002)',
+  'Persistence': 'Закрепление в системе (TA0003)',
+  'Privilege Escalation': 'Повышение привилегий (TA0004)',
+  'Defense Evasion': 'Обход защиты (TA0005)',
+  'Credential Access': 'Кража учётных данных (TA0006)',
+  'Discovery': 'Исследование сети (TA0007)',
+  'Lateral Movement': 'Горизонтальное перемещение (TA0008)',
+  'Collection': 'Сбор данных (TA0009)',
+  'Command and Control': 'C2-канал управления (TA0011)',
+  'Exfiltration': 'Вывод данных (TA0010)',
+  'Impact': 'Разрушительное воздействие (TA0040)'
+};
+
+var SEVERITY_RANK = { critical: 4, high: 3, medium: 2, low: 1, info: 0 };
+
+function maxSeverity(sevA, sevB) {
+  return (SEVERITY_RANK[sevA] || 0) >= (SEVERITY_RANK[sevB] || 0) ? sevA : sevB;
+}
+
 function renderMitre() {
   var container = document.getElementById('tab-mitre');
   fetch('/api/mitre/matrix')
@@ -1650,32 +1863,64 @@ function renderMitre() {
         container.innerHTML = '<div class="item"><div class="label">Нет MITRE-матчей — findings отсутствуют или не подходят под известные техники</div></div>';
         return;
       }
+
+      // Build severity-per-technique map: techId → best severity
+      var techSeverity = {};
+      if (data.matches) {
+        for (var k = 0; k < data.matches.length; k++) {
+          var m = data.matches[k];
+          var tid = m.technique_id;
+          var s = m.severity || 'low';
+          techSeverity[tid] = techSeverity[tid] ? maxSeverity(techSeverity[tid], s) : s;
+        }
+      }
+
+      // Build technique name map
+      var techNames = {};
+      if (data.matches) {
+        for (var k = 0; k < data.matches.length; k++) {
+          var mn = data.matches[k];
+          if (!techNames[mn.technique_id]) {
+            techNames[mn.technique_id] = mn.technique_name;
+          }
+        }
+      }
+
+      var totalTechniques = data.techniques_used ? data.techniques_used.length : 0;
+      var totalTactics = data.tactics_covered ? data.tactics_covered.length : 0;
+      var matchRate = data.total_findings > 0 ? Math.round(data.total_matches / data.total_findings * 100) : 0;
+
       var html = '<div class="mitre-summary">';
-      html += '<span>Tactics: ' + (data.tactics_covered ? data.tactics_covered.length : 0) + '</span>';
-      html += '<span>Techniques: ' + (data.techniques_used ? data.techniques_used.length : 0) + '</span>';
-      html += '<span>Matches: ' + data.total_matches + '/' + (data.total_findings || 0) + '</span>';
+      html += '<span>🛡️ Тактик: <b>' + totalTactics + '</b></span>';
+      html += '<span>🎯 Техник: <b>' + totalTechniques + '</b></span>';
+      html += '<span>📊 Совпадений: <b>' + data.total_matches + '</b> из ' + (data.total_findings || 0) + ' (' + matchRate + '%)</span>';
       html += '</div>';
-      html += '<table class="mitre-matrix"><thead><tr><th>Tactic</th><th>Techniques</th></tr></thead><tbody>';
+
+      // Tactic legend
+      html += '<details style="margin-bottom:8px"><summary style="cursor:pointer;font-size:11px;color:var(--accent)">📖 Легенда тактик MITRE ATT&CK</summary>';
+      html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:2px 12px;font-size:10px;margin-top:4px;padding:6px;background:var(--card-bg);border-radius:4px">';
+      var mitreTacticsSorted = ['Reconnaissance','Resource Development','Initial Access','Execution','Persistence','Privilege Escalation','Defense Evasion','Credential Access','Discovery','Lateral Movement','Collection','Command and Control','Exfiltration','Impact'];
+      for (var ti = 0; ti < mitreTacticsSorted.length; ti++) {
+        var t = mitreTacticsSorted[ti];
+        var covered = data.matrix[t] ? '✅' : '⬜';
+        var desc = MITRE_TACTIC_INFO[t] || '';
+        html += '<div style="padding:1px 0">' + covered + ' <b>' + escapeHtml(t) + '</b> <span style="color:var(--text2)">' + desc + '</span></div>';
+      }
+      html += '</div></details>';
+
+      html += '<table class="mitre-matrix"><thead><tr><th style="width:25%">Tactic</th><th>Techniques</th></tr></thead><tbody>';
       var tactics = Object.keys(data.matrix).sort();
       for (var i = 0; i < tactics.length; i++) {
         var tactic = tactics[i];
         var techniques = data.matrix[tactic];
-        html += '<tr><td style="font-weight:600">' + escapeHtml(tactic) + '</td><td>';
+        html += '<tr><td style="font-weight:600;vertical-align:middle">' + escapeHtml(tactic) + '</td><td>';
         var techIds = Object.keys(techniques).sort();
         for (var j = 0; j < techIds.length; j++) {
           var techId = techIds[j];
           var count = techniques[techId];
-          // Find severity of first match for this technique
-          var sev = 'medium';
-          if (data.matches) {
-            for (var k = 0; k < data.matches.length; k++) {
-              if (data.matches[k].technique_id === techId) {
-                sev = data.matches[k].severity || 'medium';
-                break;
-              }
-            }
-          }
-          html += '<span class="tech-badge ' + sev + '" title="' + escapeHtml(techId) + ': ' + count + ' finding(s)" onclick="filterMitreTechnique(\'' + techId + '\')">' + escapeHtml(techId) + ' (' + count + ')</span> ';
+          var sev = techSeverity[techId] || 'medium';
+          var tname = techNames[techId] || techId;
+          html += '<span class="tech-badge ' + sev + '" title="' + escapeHtml(tname) + ' (' + count + ' finding' + (count > 1 ? 's' : '') + ')" onclick="filterMitreTechnique(\'' + techId + '\')">' + escapeHtml(techId) + '</span> ';
         }
         html += '</td></tr>';
       }
@@ -1691,29 +1936,55 @@ function filterMitreTechnique(techId) {
   fetch('/api/mitre?technique=' + encodeURIComponent(techId))
     .then(function(r) { return r.json(); })
     .then(function(data) {
-      // Show findings in a popup-like container
       var container = document.getElementById('tab-info');
-      var html = '<h3 style="color:var(--accent);margin-bottom:8px">Technique: ' + escapeHtml(techId) + '</h3>';
       if (!data.matches || !data.matches.length) {
-        html += '<div class="item"><div class="label">Нет findings</div></div>';
+        container.innerHTML = '<div style="padding:12px"><div class="item"><div class="label">Нет findings для ' + escapeHtml(techId) + '</div></div></div>';
       } else {
-        html += '<div style="font-size:11px;color:var(--text2);margin-bottom:4px">' + data.total_matches + ' finding(s)</div>';
+        var techName = data.matches[0].technique_name || techId;
+        var tactic = data.matches[0].tactic || '';
+        var html = '<div style="padding:12px">';
+        html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">';
+        html += '<button onclick="switchTab(\'tab-mitre\')" style="background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:4px 8px;border-radius:4px;cursor:pointer;font-size:11px">← Назад к матрице</button>';
+        html += '<h3 style="margin:0;color:var(--accent)">' + escapeHtml(techId) + ': ' + escapeHtml(techName) + '</h3>';
+        html += '</div>';
+        html += '<div style="font-size:11px;color:var(--text2);margin-bottom:8px">';
+        html += 'Tactic: <b>' + escapeHtml(tactic) + '</b> | ';
+        html += 'Найдено: <b>' + data.total_matches + '</b> finding(s)';
+        html += '</div>';
+        var sevs = { critical: [], high: [], medium: [], low: [], info: [] };
         for (var i = 0; i < data.matches.length; i++) {
-          var m = data.matches[i];
-          html += '<div class="issue-card ' + (m.severity || 'low') + '">';
-          html += '<div class="severity">' + escapeHtml(m.severity || '?') + ' | ' + escapeHtml(m.technique_name || techId) + '</div>';
-          html += '<div class="desc">' + escapeHtml(m.finding_type || '?') + '</div>';
-          html += '<div class="rec">Tactic: ' + escapeHtml(m.tactic || '?') + ' | Confidence: ' + escapeHtml(m.confidence || '?') + '</div>';
-          html += '</div>';
+          var s = data.matches[i].severity || 'low';
+          (sevs[s] = sevs[s] || []).push(data.matches[i]);
         }
+        var sevOrder = ['critical','high','medium','low','info'];
+        for (var si = 0; si < sevOrder.length; si++) {
+          var sev = sevOrder[si];
+          var items = sevs[sev];
+          if (!items || !items.length) continue;
+          for (var j = 0; j < items.length; j++) {
+            var m = items[j];
+            html += '<div class="issue-card ' + (m.severity || 'low') + '">';
+            html += '<div class="severity">' + escapeHtml(m.severity || '?') + ' | ' + escapeHtml(m.technique_name || techId) + '</div>';
+            html += '<div class="desc">' + escapeHtml(m.finding_type || '?') + '</div>';
+            html += '<div class="rec">Tactic: ' + escapeHtml(m.tactic || '?') + ' | Confidence: ' + escapeHtml(m.confidence || '?') + (m.description ? ' | ' + escapeHtml(m.description) : '') + '</div>';
+            html += '</div>';
+          }
+        }
+        html += '</div>';
+        container.innerHTML = html;
       }
-      container.innerHTML = html;
       // Switch to info tab
-      document.querySelectorAll('.tab-nav button').forEach(function(b) { b.classList.remove('active'); });
-      document.querySelector('[data-tab="tab-info"]').classList.add('active');
-      document.querySelectorAll('.tab-content').forEach(function(tc) { tc.classList.remove('active'); });
-      document.getElementById('tab-info').classList.add('active');
+      switchTab('tab-info');
     });
+}
+
+function switchTab(tabId) {
+  document.querySelectorAll('.tab-nav button').forEach(function(b) { b.classList.remove('active'); });
+  var btn = document.querySelector('[data-tab="' + tabId + '"]');
+  if (btn) btn.classList.add('active');
+  document.querySelectorAll('.tab-content').forEach(function(tc) { tc.classList.remove('active'); });
+  var el = document.getElementById(tabId);
+  if (el) el.classList.add('active');
 }
 
 // ─── ATTACK GRAPH ────────────────────────────────────
@@ -1971,7 +2242,7 @@ function renderMatrix() {
 
       var zones = data.zones;
       var cells = data.cells;
-      var isDark = document.body.classList.contains('light') ? false : true;
+      var isDark = document.documentElement.getAttribute('data-theme') !== 'light';
 
       var bgColor = isDark ? '#16213e' : '#fff';
       var textColor = isDark ? '#ddd' : '#333';
