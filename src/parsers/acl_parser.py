@@ -52,6 +52,10 @@ class ACLParser(BaseParser):
         if re.search(r'access-list\s+ip\s+\w+', content, re.IGNORECASE):
             return True
         
+        # Aruba Wireless Controller: ip access-list session
+        if re.search(r'ip\s+access-list\s+session\s+\S+', content, re.IGNORECASE):
+            return True
+        
         return False
     
     def detect_vendor(self, content: str) -> str:
@@ -62,6 +66,14 @@ class ACLParser(BaseParser):
         if 'firewall {' in content_lower or 'filter ' in content_lower:
             if re.search(r'term\s+\w+\s+{', content_lower):
                 return 'juniper'
+        
+        # Aruba Wireless Controller: ip access-list session
+        if re.search(r'ip\s+access-list\s+session\s+', content_lower):
+            return 'aruba'
+        
+        # ArubaOS-CX access-list ip
+        if re.search(r'access-list\s+ip\s+\w+', content_lower):
+            return 'aruba'
         
         # Cisco стандартный синтаксис
         if re.search(r'ip\s+access-list\s+(standard|extended)', content_lower):
@@ -84,6 +96,8 @@ class ACLParser(BaseParser):
         
         if self.current_vendor == 'juniper':
             return self._parse_juniper(content)
+        elif self.current_vendor == 'aruba':
+            return self._parse_aruba_session(content)
         else:
             return self._parse_cisco_huawei(content)
     
@@ -700,6 +714,486 @@ class ACLParser(BaseParser):
             vendor='juniper'
         )
     
+    # =========================================================================
+    # Aruba Wireless Controller: ip access-list session parser
+    # =========================================================================
+    
+    def _parse_aruba_session(self, content: str) -> List[FirewallRule]:
+        """
+        Парсит Aruba Wireless Controller running-config с ip access-list session.
+        
+        Синтаксис:
+          ip access-list session <ACL_NAME>
+            <SRC> <DST> <SVC> <ACTION> [queue high] [tos N] [dot1p-priority N] [src-nat] [dst-nat N]
+        
+        Где:
+          <SRC>/<DST> = any | host <IP> | network <IP> <MASK> | alias <NAME> | user | ipv6 ...
+          <SVC> = any | svc-<NAME> | tcp <PORT> | udp <PORT> | icmp echo | app <NAME>
+          <ACTION> = permit | deny | src-nat | dst-nat N
+        
+        Также парсит netservice и netdestination для резолва имён.
+        """
+        # Phase 1: Parse netservice definitions
+        netservices = self._parse_aruba_netservices(content)
+        
+        # Phase 2: Parse netdestination definitions (aliases)
+        netdestinations = self._parse_aruba_netdestinations(content)
+        
+        # Phase 3: Parse access-list session rules
+        rules = []
+        lines = content.split('\n')
+        
+        current_acl = None
+        rule_counter = 0
+        
+        for line_num, line in enumerate(lines, 1):
+            original_line = line
+            line_stripped = line.strip()
+            
+            # Skip comments and empty lines
+            if not line_stripped or line_stripped.startswith('#') or line_stripped.startswith('!'):
+                # ! ends an ACL block in Aruba
+                if line_stripped == '!' and current_acl:
+                    current_acl = None
+                continue
+            
+            # Detect ACL start: ip access-list session <NAME>
+            acl_match = re.match(r'ip\s+access-list\s+session\s+(\S+)', line_stripped, re.IGNORECASE)
+            if acl_match:
+                current_acl = acl_match.group(1)
+                rule_counter = 0
+                continue
+            
+            # If not inside an ACL, skip
+            if not current_acl:
+                continue
+            
+            # Skip empty ACLs
+            if line_stripped == '!':
+                current_acl = None
+                continue
+            
+            # Skip lines without permit/deny/src-nat/dst-nat - these are not rules
+            if not re.search(r'\b(permit|deny|src-nat|dst-nat)\b', line_stripped, re.IGNORECASE):
+                continue
+            
+            # Parse the rule
+            rule = self._parse_aruba_session_rule(
+                line_stripped, current_acl, line_num, rule_counter,
+                netservices, netdestinations
+            )
+            if rule:
+                rules.append(rule)
+                rule_counter += 1
+        
+        return rules
+    
+    def _parse_aruba_netservices(self, content: str) -> dict:
+        """
+        Парсит netservice определения.
+        
+        netservice svc-http tcp 80
+        netservice svc-https tcp 443
+        netservice svc-dns udp 53 alg dns
+        netservice svc-icmp 1
+        netservice svc-esp 50
+        """
+        services = {}
+        
+        for match in re.finditer(
+            r'netservice\s+(\S+)\s+(tcp|udp|ip)\s+(\d+)(?:\s+alg\s+(\S+))?',
+            content, re.IGNORECASE
+        ):
+            name = match.group(1)
+            protocol = match.group(2).lower()
+            port = match.group(3)
+            services[name] = {'protocol': protocol, 'port': port}
+        
+        # Также обрабатываем netservice без порта (icmp, esp, gre - номер протокола)
+        for match in re.finditer(
+            r'netservice\s+(\S+)\s+(\d+)',
+            content, re.IGNORECASE
+        ):
+            name = match.group(1)
+            proto_num = match.group(2)
+            if name not in services:
+                proto_map = {'1': 'icmp', '50': 'esp', '47': 'gre', '58': 'icmpv6'}
+                protocol = proto_map.get(proto_num, f'proto_{proto_num}')
+                services[name] = {'protocol': protocol, 'port': None}
+        
+        # netservice с tcp/udp и списком портов
+        for match in re.finditer(
+            r'netservice\s+(\S+)\s+tcp\s+list\s+"(\S+)"',
+            content, re.IGNORECASE
+        ):
+            name = match.group(1)
+            services[name] = {'protocol': 'tcp', 'port': 'list'}
+        
+        return services
+    
+    def _parse_aruba_netdestinations(self, content: str) -> dict:
+        """
+        Парсит netdestination определения (alias'ы).
+        
+        netdestination guest-printers
+            host 10.0.0.1
+            host 10.0.0.2
+        !
+        netdestination cu-mm-computers
+            network 10.1.0.0 255.255.255.0
+        !
+        """
+        destinations = {}
+        lines = content.split('\n')
+        
+        current_dest = None
+        current_hosts = []
+        
+        for line in lines:
+            line_stripped = line.strip()
+            
+            # Начало netdestination
+            dest_match = re.match(r'netdestination\s+(\S+)', line_stripped, re.IGNORECASE)
+            if dest_match:
+                # Сохраняем предыдущий
+                if current_dest and current_hosts:
+                    destinations[current_dest] = current_hosts
+                current_dest = dest_match.group(1)
+                current_hosts = []
+                continue
+            
+            # Конец блока
+            if line_stripped == '!' and current_dest is not None:
+                if current_hosts:
+                    destinations[current_dest] = current_hosts
+                current_dest = None
+                current_hosts = []
+                continue
+            
+            # Строки внутри блока
+            if current_dest and line_stripped and not line_stripped.startswith('!'):
+                # description "..."
+                if line_stripped.startswith('description'):
+                    continue
+                # invert
+                if line_stripped == 'invert':
+                    continue
+                # name hostname.domain
+                if line_stripped.startswith('name '):
+                    name_val = line_stripped.split(None, 1)[1] if len(line_stripped.split()) > 1 else ''
+                    current_hosts.append({'type': 'name', 'value': name_val})
+                    continue
+                # host IP
+                host_match = re.match(r'host\s+(\S+)', line_stripped, re.IGNORECASE)
+                if host_match:
+                    current_hosts.append({'type': 'host', 'value': host_match.group(1)})
+                    continue
+                # network IP MASK
+                net_match = re.match(r'network\s+(\S+)\s+(\S+)', line_stripped, re.IGNORECASE)
+                if net_match:
+                    current_hosts.append({
+                        'type': 'network',
+                        'ip': net_match.group(1),
+                        'mask': net_match.group(2)
+                    })
+                    continue
+                # name (продолжение списка)
+                name_match = re.match(r'name\s+(\S+)', line_stripped, re.IGNORECASE)
+                if name_match:
+                    current_hosts.append({'type': 'name', 'value': name_match.group(1)})
+                    continue
+        
+        # Последний блок
+        if current_dest and current_hosts:
+            destinations[current_dest] = current_hosts
+        
+        return destinations
+    
+    def _parse_aruba_session_rule(
+        self, line: str, acl_name: str, line_num: int, rule_idx: int,
+        netservices: dict, netdestinations: dict
+    ) -> Optional[FirewallRule]:
+        """
+        Парсит одну строку правила Aruba ip access-list session.
+        
+        Формат: <SRC> <DST> <SVC> <ACTION> [queue high] ...
+        """
+        tokens = line.split()
+        if len(tokens) < 4:
+            return None
+        
+        # Определяем позицию action (permit/deny/src-nat/dst-nat) - она может быть не последней
+        action_idx = None
+        action = None
+        for i, t in enumerate(tokens):
+            if t.lower() in ('permit', 'deny', 'src-nat', 'dst-nat'):
+                action_idx = i
+                action = t.lower()
+                break
+        
+        if action_idx is None:
+            return None
+        
+        # Нормализуем action
+        if action in ('permit', 'src-nat', 'dst-nat'):
+            action = 'accept'
+        else:
+            action = 'deny'
+        
+        # Токены до action: src dst svc (но может быть разный порядок!)
+        # В Aruba формат строгий: <SRC> <DST> <SVC> <ACTION>
+        pre_tokens = tokens[:action_idx]
+        post_tokens = tokens[action_idx + 1:]
+        
+        if len(pre_tokens) < 1:
+            return None
+        
+        # Парсим src, dst, svc из pre_tokens
+        # Порядок: SRC DST SVC (может быть 3 токена для any any any)
+        # Или: alias NAME alias NAME svc-NAME
+        # Или: any host IP any / any network IP MASK any
+        
+        sources = []
+        destinations = []
+        services = []
+        
+        pos = 0
+        n = len(pre_tokens)
+        
+        # Парсим source
+        src_token = pre_tokens[pos] if pos < n else 'any'
+        if src_token == 'any':
+            sources = [Endpoint('any', 'host', {'0.0.0.0/0'})]
+            pos += 1
+        elif src_token == 'user':
+            sources = [Endpoint('user', 'group', set())]
+            pos += 1
+        elif src_token == 'alias':
+            pos += 1
+            if pos < n:
+                alias_name = pre_tokens[pos]
+                sources = self._resolve_aruba_endpoint(alias_name, netdestinations)
+                pos += 1
+        elif src_token == 'host':
+            pos += 1
+            if pos < n:
+                ip = pre_tokens[pos]
+                sources = [Endpoint(ip, 'host', {ip})]
+                pos += 1
+        elif src_token == 'network':
+            pos += 1
+            if pos + 1 < n:
+                ip = pre_tokens[pos]
+                mask = pre_tokens[pos + 1]
+                cidr = self._netmask_to_cidr(mask)
+                network = f"{ip}/{cidr}"
+                sources = [Endpoint(network, 'subnet', {network})]
+                pos += 2
+        elif src_token.startswith('ipv6'):
+            # ipv6 any ... - пропускаем
+            sources = [Endpoint('ipv6_any', 'host', set())]
+            pos += 1
+        else:
+            # Возможно это IP-адрес или alias без ключевого слова
+            sources = [Endpoint(src_token, 'host', {src_token})]
+            pos += 1
+        
+        # Парсим destination
+        if pos < n:
+            dst_token = pre_tokens[pos]
+            if dst_token.lower() in ('permit', 'deny', 'src-nat', 'dst-nat'):
+                # action встретился раньше - значит dst не указан
+                pass
+            elif dst_token == 'any':
+                destinations = [Endpoint('any', 'host', {'0.0.0.0/0'})]
+                pos += 1
+            elif dst_token == 'user':
+                destinations = [Endpoint('user', 'group', set())]
+                pos += 1
+            elif dst_token == 'alias':
+                pos += 1
+                if pos < n:
+                    alias_name = pre_tokens[pos]
+                    destinations = self._resolve_aruba_endpoint(alias_name, netdestinations)
+                    pos += 1
+            elif dst_token == 'host':
+                pos += 1
+                if pos < n:
+                    ip = pre_tokens[pos]
+                    destinations = [Endpoint(ip, 'host', {ip})]
+                    pos += 1
+            elif dst_token == 'network':
+                pos += 1
+                if pos + 1 < n:
+                    ip = pre_tokens[pos]
+                    mask = pre_tokens[pos + 1]
+                    cidr = self._netmask_to_cidr(mask)
+                    network = f"{ip}/{cidr}"
+                    destinations = [Endpoint(network, 'subnet', {network})]
+                    pos += 2
+            elif dst_token.startswith('ipv6'):
+                destinations = [Endpoint('ipv6_any', 'host', set())]
+                pos += 1
+            else:
+                destinations = [Endpoint(dst_token, 'host', {dst_token})]
+                pos += 1
+        
+        if not destinations:
+            destinations = [Endpoint('any', 'host', {'0.0.0.0/0'})]
+        
+        # Парсим service
+        if pos < n:
+            svc_token = pre_tokens[pos]
+            if svc_token == 'any':
+                services = [Service('any', 'ip', {'any'})]
+                pos += 1
+            elif svc_token.startswith('svc-'):
+                svc_info = netservices.get(svc_token, {})
+                if svc_info:
+                    ports = {svc_info['port']} if svc_info.get('port') else set()
+                    services = [Service(svc_token, svc_info.get('protocol', 'ip'), ports)]
+                else:
+                    services = [Service(svc_token, 'ip', set())]
+                pos += 1
+            elif svc_token == 'sys-svc-dhcp':
+                services = [Service('dhcp', 'udp', {'67', '68'})]
+                pos += 1
+            elif svc_token == 'sys-svc-esp':
+                services = [Service('esp', 'esp', set())]
+                pos += 1
+            elif svc_token == 'sys-svc-natt':
+                services = [Service('natt', 'udp', {'4500'})]
+                pos += 1
+            elif svc_token == 'sys-svc-ike':
+                services = [Service('ike', 'udp', {'500'})]
+                pos += 1
+            elif svc_token == 'sys-svc-icmp':
+                services = [Service('icmp', 'icmp', set())]
+                pos += 1
+            elif svc_token == 'sys-svc-icmp6':
+                services = [Service('icmpv6', 'icmpv6', set())]
+                pos += 1
+            elif svc_token == 'sys-svc-v6-dhcp':
+                services = [Service('dhcpv6', 'udp', {'546', '547'})]
+                pos += 1
+            elif svc_token == 'sys-svc-snmp':
+                services = [Service('snmp', 'udp', {'161'})]
+                pos += 1
+            elif svc_token == 'sys-svc-snmp-trap':
+                services = [Service('snmp-trap', 'udp', {'162'})]
+                pos += 1
+            elif svc_token == 'sys-svc-ntp':
+                services = [Service('ntp', 'udp', {'123'})]
+                pos += 1
+            elif svc_token == 'sys-svc-ftp':
+                services = [Service('ftp', 'tcp', {'21'})]
+                pos += 1
+            elif svc_token == 'sys-svc-telnet':
+                services = [Service('telnet', 'tcp', {'23'})]
+                pos += 1
+            elif svc_token == 'sys-svc-ssh':
+                services = [Service('ssh', 'tcp', {'22'})]
+                pos += 1
+            elif svc_token in ('tcp', 'udp'):
+                protocol = svc_token
+                pos += 1
+                if pos < n:
+                    port_token = pre_tokens[pos]
+                    if port_token.isdigit():
+                        services = [Service(f"{protocol}/{port_token}", protocol, {port_token})]
+                        pos += 1
+                    else:
+                        services = [Service(protocol, protocol, set())]
+                else:
+                    services = [Service(protocol, protocol, set())]
+            elif svc_token in ('icmp', 'icmpv6'):
+                pos += 1
+                if pos < n and pre_tokens[pos] in ('echo', 'rtr-adv'):
+                    services = [Service(f"{svc_token}-{pre_tokens[pos]}", svc_token, set())]
+                    pos += 1
+                else:
+                    services = [Service(svc_token, svc_token, set())]
+            elif svc_token.isdigit():
+                # Номер протокола (1=icmp, 50=esp и т.д.)
+                proto_map = {'1': 'icmp', '50': 'esp', '47': 'gre', '58': 'icmpv6'}
+                protocol = proto_map.get(svc_token, f'proto_{svc_token}')
+                services = [Service(f'proto_{svc_token}', protocol, set())]
+                pos += 1
+            elif svc_token == 'app':
+                # app alg-* - application-level ALG
+                pos += 1
+                if pos < n:
+                    services = [Service(f"app/{pre_tokens[pos]}", 'app', set())]
+                    pos += 1
+            else:
+                services = [Service(svc_token, 'ip', set())]
+                pos += 1
+        
+        if not services:
+            services = [Service('any', 'ip', {'any'})]
+        
+        # Пост-токены: queue, tos, dot1p-priority и т.д. - игнорируем
+        
+        return FirewallRule(
+            name=f"{acl_name}_r{rule_idx}",
+            rule_id=f"{acl_name}.{rule_idx}",
+            sources=sources,
+            destinations=destinations,
+            services=services,
+            action=action,
+            enabled=True,
+            description=f"Aruba session ACL {acl_name} rule #{rule_idx}",
+            vendor='aruba'
+        )
+    
+    def _resolve_aruba_endpoint(self, alias_name: str, netdestinations: dict) -> List[Endpoint]:
+        """
+        Разворачивает alias в список Endpoint'ов.
+        
+        Если alias найден в netdestinations - создаёт отдельные Endpoint для каждого host/network.
+        Иначе возвращает один Endpoint с типом 'group'.
+        """
+        entries = netdestinations.get(alias_name, [])
+        if not entries:
+            return [Endpoint(alias_name, 'group', set())]
+        
+        endpoints = []
+        for entry in entries:
+            if entry['type'] == 'host':
+                ip = entry['value']
+                endpoints.append(Endpoint(ip, 'host', {ip}, description=f"alias:{alias_name}"))
+            elif entry['type'] == 'network':
+                ip = entry['ip']
+                mask = entry['mask']
+                cidr = self._netmask_to_cidr(mask)
+                network = f"{ip}/{cidr}"
+                endpoints.append(Endpoint(network, 'subnet', {network}, description=f"alias:{alias_name}"))
+            elif entry['type'] == 'name':
+                # DNS name - создаём symbolic endpoint
+                endpoints.append(Endpoint(entry['value'], 'host', set(), description=f"alias:{alias_name}"))
+        
+        return endpoints if endpoints else [Endpoint(alias_name, 'group', set())]
+    
+    def _netmask_to_cidr(self, mask: str) -> int:
+        """Конвертирует subnet mask (255.255.255.0) в CIDR (24)."""
+        try:
+            parts = mask.split('.')
+            if len(parts) != 4:
+                return 32
+            mask_int = 0
+            for part in parts:
+                mask_int = (mask_int << 8) | int(part)
+            if mask_int == 0:
+                return 0
+            # Считаем leading 1-bits
+            bits = 0
+            while mask_int & 0x80000000:
+                bits += 1
+                mask_int = (mask_int << 1) & 0xFFFFFFFF
+            return bits
+        except (ValueError, AttributeError):
+            return 32
+
     def _parse_endpoint_spec(self, spec: str) -> List[Endpoint]:
         """Парсит спецификацию endpoint."""
         if not spec:

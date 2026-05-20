@@ -205,6 +205,73 @@ async def export_json():
     }
 
 
+@app.get("/api/zone-matrix")
+async def get_zone_matrix():
+    """Возвращает данные для матрицы зон безопасности."""
+    analyzer = analyzer_state.get("analyzer")
+    if not analyzer or not hasattr(analyzer, 'graph') or analyzer.graph.number_of_nodes() == 0:
+        return {'zones': [], 'cells': {}}
+
+    from src.graph.visualizer import GraphVisualizer
+    visualizer = GraphVisualizer(analyzer.graph, analyzer.rules)
+    matrix_data = visualizer._generate_zone_matrix_data()
+    return matrix_data
+
+
+# ─── Visualization Data ──────────────────────────────────────
+
+@app.get("/api/sankey")
+async def get_sankey():
+    """Возвращает данные для Sankey-диаграммы потоков между зонами."""
+    analyzer = analyzer_state.get("analyzer")
+    if not analyzer or not hasattr(analyzer, 'graph') or analyzer.graph.number_of_nodes() == 0:
+        return {'nodes': [], 'links': []}
+
+    from src.graph.visualizer import GraphVisualizer
+    visualizer = GraphVisualizer(analyzer.graph, analyzer.rules)
+    data = visualizer._generate_sankey_data()
+    return data
+
+
+@app.get("/api/services")
+async def get_services():
+    """Возвращает топ-30 сервисов из рёбер графа."""
+    analyzer = analyzer_state.get("analyzer")
+    if not analyzer or not hasattr(analyzer, 'graph') or analyzer.graph.number_of_nodes() == 0:
+        return []
+
+    from src.graph.visualizer import GraphVisualizer
+    visualizer = GraphVisualizer(analyzer.graph, analyzer.rules)
+    data = visualizer._generate_service_data()
+    return data
+
+
+@app.get("/api/risk-severity")
+async def get_risk_severity():
+    """Возвращает распределение рисков по severity."""
+    analyzer = analyzer_state.get("analyzer")
+    if not analyzer or not hasattr(analyzer, 'graph') or analyzer.graph.number_of_nodes() == 0:
+        return []
+
+    from src.graph.visualizer import GraphVisualizer
+    visualizer = GraphVisualizer(analyzer.graph, analyzer.rules)
+    data = visualizer._generate_risk_severity_data()
+    return data
+
+
+@app.get("/api/hilbert")
+async def get_hilbert():
+    """Возвращает данные для Hilbert IP-space карты."""
+    analyzer = analyzer_state.get("analyzer")
+    if not analyzer or not hasattr(analyzer, 'graph') or analyzer.graph.number_of_nodes() == 0:
+        return {'points': [], 'gridSize': 4096, 'totalPoints': 0}
+
+    from src.graph.visualizer import GraphVisualizer
+    visualizer = GraphVisualizer(analyzer.graph, analyzer.rules)
+    data = visualizer._generate_hilbert_data()
+    return data
+
+
 @app.post("/api/siem/export")
 async def siem_export(request: dict = None):
     from src.integrations.siem_export import export_all_formats

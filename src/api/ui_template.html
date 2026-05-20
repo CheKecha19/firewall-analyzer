@@ -245,6 +245,42 @@ path-panel .hop {
 }
 path-panel .hop.active { background: var(--accent); color: #fff; border-color: var(--accent); }
 path-panel .hop-arrow { color: var(--text2); font-size: 14px; margin: 0 2px; }
+path-panel .hop.blocked { background: #e74c3c; color: #fff; border-color: #c0392b; animation: pulse-red 0.6s ease-in-out infinite alternate; }
+path-panel .hop.accepted { background: #27ae60; color: #fff; border-color: #1e8449; }
+@keyframes pulse-red {
+  from { box-shadow: 0 0 4px #e74c3c; }
+  to { box-shadow: 0 0 12px #e74c3c; }
+}
+
+#drill-bread {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 310px;
+  background: var(--panel-bg);
+  border-bottom: 1px solid var(--border);
+  padding: 6px 12px;
+  display: none;
+  z-index: 5;
+  font-size: 12px;
+  align-items: center;
+  gap: 8px;
+  backdrop-filter: blur(8px);
+}
+#drill-bread.visible { display: flex; }
+#drill-bread .bread-btn {
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 3px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  transition: background 0.2s;
+}
+#drill-bread .bread-btn:hover { background: var(--hover-bg); }
+#drill-bread .bread-label { color: var(--text2); }
+#drill-bread .bread-zone { font-weight: 600; color: var(--accent); }
 
 /* MITRE Matrix */
 .mitre-matrix { width: 100%; border-collapse: collapse; font-size: 10px; }
@@ -360,6 +396,43 @@ path-panel .hop-arrow { color: var(--text2); font-size: 14px; margin: 0 2px; }
 .top-item .rank { font-weight: 700; color: var(--accent); min-width: 20px; }
 .top-item .detail { flex: 1; }
 .top-item .meta { color: var(--text2); font-size: 10px; }
+
+/* Sankey Diagram */
+#sankey-canvas { width: 100%; height: 100%; min-height: 400px; }
+.sankey-legend { display: flex; flex-wrap: wrap; gap: 4px; margin: 8px 0; font-size: 11px; }
+.sankey-legend .swatch { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 3px; vertical-align: middle; }
+
+/* Hilbert IP Map */
+#hilbert-canvas { width: 100%; height: 100%; min-height: 400px; }
+.hilbert-tooltip {
+  position: absolute;
+  background: var(--panel-bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 11px;
+  pointer-events: none;
+  z-index: 30;
+  display: none;
+  backdrop-filter: blur(8px);
+  max-width: 200px;
+}
+
+/* Risk Donut */
+#risk-donut { width: 100%; max-height: 250px; }
+.donut-legend { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; font-size: 11px; }
+.donut-legend .dl-item { display: flex; align-items: center; gap: 4px; }
+.donut-legend .dl-swatch { width: 12px; height: 12px; border-radius: 3px; }
+
+/* Service Table */
+#service-table { margin-top: 8px; }
+.svc-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.svc-table th { background: var(--header-bg); color: var(--text2); padding: 4px 6px; text-align: left; font-weight: 500; font-size: 10px; text-transform: uppercase; }
+.svc-table td { padding: 4px 6px; border-bottom: 1px solid var(--border); }
+.svc-table tr:hover { background: var(--hover-bg); }
+.svc-table .bar-cell { width: 80px; }
+.svc-table .bar-bg { height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; }
+.svc-table .bar-fill { height: 100%; background: var(--accent); border-radius: 3px; }
 
 /* Topology summary cards */
 .topo-summary {
@@ -581,12 +654,45 @@ path-panel .hop-arrow { color: var(--text2); font-size: 14px; margin: 0 2px; }
       <button data-tab="tab-mitre">🛡️ MITRE</button>
       <button data-tab="tab-quality">⚙️ Качество</button>
       <button data-tab="tab-optimizer">🔧 Оптимизация</button>
+      <button data-tab="tab-matrix">🔲 Матрица</button>
+      <button data-tab="tab-sankey">🌊 Sankey</button>
+      <button data-tab="tab-hilbert">🗺️ Hilbert</button>
     </div>
     <div class="tab-content active" id="tab-dashboard">
       <div id="dashboard-content" style="font-size:12px;color:var(--text2);">Загрузка дашборда...</div>
+      <div id="dashboard-extras" style="margin-top:8px;">
+        <div class="chart-container" id="risk-donut-container">
+          <h4>🎯 Risk Severity</h4>
+          <canvas id="risk-donut"></canvas>
+          <div class="donut-legend" id="donut-legend"></div>
+        </div>
+        <div class="chart-container" id="service-table-container">
+          <h4>📡 Top Services</h4>
+          <div id="service-table">Загрузка...</div>
+        </div>
+      </div>
     </div>
     <div class="tab-content" id="tab-rules"></div>
     <div class="tab-content" id="tab-audit"></div>
+    <div class="tab-content" id="tab-matrix">
+      <div id="matrix-content" style="font-size:12px;color:var(--text2);overflow:auto;">
+        <div style="text-align:center;padding:20px;">
+          <div class="label">Загрузка матрицы зон...</div>
+        </div>
+      </div>
+    </div>
+    <div class="tab-content" id="tab-sankey">
+      <div style="position:relative;width:100%;height:100%;display:flex;flex-direction:column;">
+        <canvas id="sankey-canvas"></canvas>
+        <div class="sankey-legend" id="sankey-legend"></div>
+      </div>
+    </div>
+    <div class="tab-content" id="tab-hilbert">
+      <div style="position:relative;width:100%;height:100%;">
+        <canvas id="hilbert-canvas"></canvas>
+        <div class="hilbert-tooltip" id="hilbert-tooltip"></div>
+      </div>
+    </div>
     <div class="tab-content" id="tab-mitre">
       <div id="mitre-content" style="font-size:12px;color:var(--text2)">Загрузка...</div>
     </div>
@@ -615,6 +721,11 @@ path-panel .hop-arrow { color: var(--text2); font-size: 14px; margin: 0 2px; }
       </div>
     </div>
   </div>
+  <div id="drill-bread">
+    <span class="bread-label">📌 Зона:</span>
+    <span class="bread-zone" id="drill-zone-name"></span>
+    <button class="bread-btn" onclick="resetDrillDown()">← Назад к полному графу</button>
+  </div>
   <path-panel id="path-panel"></path-panel>
 </div>
 
@@ -633,6 +744,9 @@ var selectedNodes = [];
 var selectedEdges = [];
 var network = null;
 var pathData = [];
+var pathEdges = [];
+var pathAnimationTimer = null;
+var prevGraphState = null; // Saved state for drill-down back button
 
 // ─── INIT ────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', function() {
@@ -763,6 +877,7 @@ function initNetwork() {
   network = new vis.Network(container, dataSet, options);
 
   network.on('click', function(params) {
+    if (pathAnimationTimer) return; // Don't override info panel during path trace animation
     if (params.nodes.length === 1) {
       showNodeInfo(params.nodes[0]);
     }
@@ -774,7 +889,12 @@ function initNetwork() {
 
   network.on('doubleClick', function(params) {
     if (params.nodes.length > 0) {
-      network.focus(params.nodes[0], { scale: 1.5, animation: { duration: 400, easingFunction: 'easeInOutQuad' } });
+      var node = allNodes.find(function(n) { return n.id === params.nodes[0]; });
+      if (node) {
+        drillToZone(node.group || node.id);
+      } else {
+        network.focus(params.nodes[0], { scale: 1.5, animation: { duration: 400, easingFunction: 'easeInOutQuad' } });
+      }
     }
   });
 
@@ -1080,27 +1200,35 @@ function tracePath() {
   if (!src || !dst) return alert('Введите Source и Destination');
   if (!network) return;
 
+  // Clear any running animation
+  if (pathAnimationTimer) { clearTimeout(pathAnimationTimer); pathAnimationTimer = null; }
+
+  // Build adjacency with edge info (undirected for BFS)
   var edgeMap = {};
+  var edgeInfoMap = {}; // key: "from|to" -> edge object
   allEdges.forEach(function(e) {
     if (!edgeMap[e.from]) edgeMap[e.from] = [];
     edgeMap[e.from].push(e.to);
+    edgeInfoMap[e.from + '|' + e.to] = e;
     if (!edgeMap[e.to]) edgeMap[e.to] = [];
     edgeMap[e.to].push(e.from);
+    edgeInfoMap[e.to + '|' + e.from] = e;
   });
 
-  var visited = {}, queue = [[src]];
+  var visited = {}, queue = [[src]], edgePath = [[]];
   visited[src] = true;
-  var foundPath = null;
+  var foundPath = null, foundEdgePath = null;
   while (queue.length > 0) {
     var path = queue.shift();
+    var epath = edgePath.shift();
     var node = path[path.length - 1];
-    if (node === dst) { foundPath = path; break; }
+    if (node === dst) { foundPath = path; foundEdgePath = epath; break; }
     var neighbors = edgeMap[node] || [];
     for (var i = 0; i < neighbors.length; i++) {
       if (!visited[neighbors[i]]) {
         visited[neighbors[i]] = true;
-        var newPath = path.concat([neighbors[i]]);
-        queue.push(newPath);
+        queue.push(path.concat([neighbors[i]]));
+        edgePath.push(epath.concat([edgeInfoMap[node + '|' + neighbors[i]] || null]));
       }
     }
   }
@@ -1108,9 +1236,27 @@ function tracePath() {
   if (!foundPath) return alert('Путь не найден между ' + src + ' и ' + dst);
 
   pathData = foundPath;
+  pathEdges = foundEdgePath;
+
+  // Build panel UI
   var panel = document.getElementById('path-panel');
   panel.style.display = 'block';
-  panel.innerHTML = '<strong>Path: </strong>';
+  panel.innerHTML = '<strong>Path Trace: </strong>';
+
+  // Pre-analyze edge actions
+  var blockedAt = -1;
+  for (var i = 0; i < foundEdgePath.length; i++) {
+    var edge = foundEdgePath[i];
+    var action = 'unknown';
+    if (edge && edge.title) {
+      if (edge.title.toLowerCase().indexOf('deny') >= 0 || edge.title.toLowerCase().indexOf('drop') >= 0 || edge.title.toLowerCase().indexOf('block') >= 0) {
+        action = 'deny';
+      } else if (edge.title.toLowerCase().indexOf('accept') >= 0 || edge.title.toLowerCase().indexOf('allow') >= 0 || edge.title.toLowerCase().indexOf('permit') >= 0) {
+        action = 'accept';
+      }
+    }
+    if (action === 'deny' && blockedAt < 0) blockedAt = i;
+  }
 
   foundPath.forEach(function(hop, i) {
     var span = document.createElement('span');
@@ -1121,38 +1267,224 @@ function tracePath() {
     if (i < foundPath.length - 1) {
       var arrow = document.createElement('span');
       arrow.className = 'hop-arrow';
+      arrow.id = 'arrow-' + i;
       arrow.textContent = '→';
       panel.appendChild(arrow);
     }
   });
 
-  animatePath(0);
+  // Reset edge colors first
+  allEdges.forEach(function(e) {
+    network.body.data.edges.update({ id: e.id, color: '#cccccc', width: 1 });
+  });
+
+  animatePath(0, blockedAt);
 }
 
-function animatePath(idx) {
+function animatePath(idx, blockedAt) {
   if (idx >= pathData.length) return;
-  document.querySelectorAll('#path-panel .hop').forEach(function(h) { h.classList.remove('active'); });
+
+  // Highlight current hop in panel
+  document.querySelectorAll('#path-panel .hop').forEach(function(h) { h.classList.remove('active', 'blocked', 'accepted'); });
   var hopEl = document.getElementById('hop-' + idx);
+
+  // Color previous edge back to normal, highlight current edge
+  if (idx > 0) {
+    var prevEdge = pathEdges[idx - 1];
+    if (prevEdge) {
+      network.body.data.edges.update({ id: prevEdge.id, color: '#cccccc', width: 1 });
+    }
+  }
+
+  // Analyze current edge (edge from idx-1 to idx)
+  var edge = idx > 0 ? pathEdges[idx - 1] : null;
+  var action = 'unknown';
+  var actionDetails = '';
+  var isBlocked = (blockedAt >= 0 && idx > blockedAt);
+
+  if (edge && edge.title) {
+    var titleLower = edge.title.toLowerCase();
+    if (titleLower.indexOf('deny') >= 0 || titleLower.indexOf('drop') >= 0 || titleLower.indexOf('block') >= 0) {
+      action = 'deny';
+      actionDetails = 'DENY';
+    } else if (titleLower.indexOf('accept') >= 0 || titleLower.indexOf('allow') >= 0 || titleLower.indexOf('permit') >= 0) {
+      action = 'accept';
+      actionDetails = 'ACCEPT';
+    }
+  }
+
+  // Color current edge
+  if (edge && idx > 0) {
+    var edgeColor, edgeWidth;
+    if (action === 'deny' || isBlocked) {
+      edgeColor = { color: '#e74c3c', highlight: '#ff4444', hover: '#c0392b' };
+      edgeWidth = 4;
+      if (hopEl) { hopEl.classList.add('blocked'); hopEl.title = actionDetails; }
+    } else {
+      edgeColor = { color: '#27ae60', highlight: '#2ecc71', hover: '#1e8449' };
+      edgeWidth = 3;
+      if (hopEl) { hopEl.classList.add('accepted'); hopEl.title = actionDetails; }
+    }
+    network.body.data.edges.update({ id: edge.id, color: edgeColor, width: edgeWidth });
+    // Highlight arrow too
+    var arrowEl = document.getElementById('arrow-' + (idx - 1));
+    if (arrowEl) {
+      arrowEl.style.color = (action === 'deny' || isBlocked) ? '#e74c3c' : '#27ae60';
+      arrowEl.style.fontWeight = 'bold';
+    }
+  }
+
+  // Update info panel
+  var detailHtml = '<div class="label" style="font-size:14px;font-weight:700;margin-bottom:8px;">🔍 Path Trace</div>';
+  detailHtml += '<div class="label">Хоп <b>' + idx + '</b> из <b>' + (pathData.length - 1) + '</b></div>';
+  detailHtml += '<div class="label" style="margin-top:4px;">Узел: <b>' + pathData[idx] + '</b></div>';
+
+  // Find node info
+  var nodeInfo = allNodes.find(function(n) { return n.id === pathData[idx]; });
+  if (nodeInfo) {
+    detailHtml += '<div class="label">Зона: <b>' + (nodeInfo.group || '—') + '</b></div>';
+    detailHtml += '<div class="label">Тип: <b>' + (nodeInfo.type || '—') + '</b></div>';
+  }
+
+  if (edge && idx > 0) {
+    detailHtml += '<div class="label" style="margin-top:8px;">Ребро: <b>' + pathData[idx - 1] + ' → ' + pathData[idx] + '</b></div>';
+    detailHtml += '<div class="label">Действие: <b style="color:' + ((action === 'deny' || isBlocked) ? '#e74c3c' : '#27ae60') + '">' + actionDetails + '</b></div>';
+    if (edge.risk) {
+      detailHtml += '<div class="label">Риск: <b>' + edge.risk + '/10</b></div>';
+    }
+    if (edge.title) {
+      detailHtml += '<div class="label" style="font-size:10px;color:var(--text2);">' + edge.title.replace(/\n/g, '<br>') + '</div>';
+    }
+  }
+
+  if (blockedAt >= 0 && idx === blockedAt + 1) {
+    detailHtml += '<div class="label" style="margin-top:8px;color:#e74c3c;font-weight:700;">⛔ BLOCKED на шаге ' + blockedAt + '</div>';
+  }
+
+  if (idx === pathData.length - 1 && blockedAt < 0) {
+    detailHtml += '<div class="label" style="margin-top:8px;color:#27ae60;font-weight:700;">✅ Достижим за ' + (pathData.length - 1) + ' шагов</div>';
+  }
+
+  document.getElementById('info-content').innerHTML = detailHtml;
+
   if (hopEl) hopEl.classList.add('active');
 
-  var nodesToShow = pathData.slice(0, idx + 1);
-  if (network) {
-    network.selectNodes(nodesToShow, false);
-    if (idx > 0) {
-      network.focus(pathData[idx], { scale: 1.2, animation: { duration: 300, easingFunction: 'easeInOutQuad' } });
+  // Stop animation if blocked
+  if (isBlocked) {
+    // Keep red pulsing on blocked node
+    if (hopEl) hopEl.classList.add('blocked');
+    // Leave path message
+    var panel = document.getElementById('path-panel');
+    var msgEl = document.getElementById('path-status-msg');
+    if (!msgEl) {
+      msgEl = document.createElement('div');
+      msgEl.id = 'path-status-msg';
+      msgEl.style.cssText = 'color:#e74c3c;font-weight:700;font-size:12px;margin-top:6px;';
+      panel.appendChild(msgEl);
     }
+    msgEl.textContent = '⛔ BLOCKED — путь заблокирован на шаге ' + (idx - 1);
+    return;
+  }
+
+  // Focus on current node
+  if (network) {
+    network.selectNodes([pathData[idx]], false);
+    network.focus(pathData[idx], { scale: 1.3, animation: { duration: 250, easingFunction: 'easeInOutQuad' } });
     renderMinimap();
   }
 
-  setTimeout(function() { animatePath(idx + 1); }, 400);
+  pathAnimationTimer = setTimeout(function() { animatePath(idx + 1, blockedAt); }, 300);
 }
 
 function clearPath() {
+  if (pathAnimationTimer) { clearTimeout(pathAnimationTimer); pathAnimationTimer = null; }
+  // Reset edge colors
+  allEdges.forEach(function(e) {
+    network.body.data.edges.update({ id: e.id, color: '#cccccc', width: 1 });
+  });
   pathData = [];
-  document.getElementById('path-panel').style.display = 'none';
+  pathEdges = [];
+  var panel = document.getElementById('path-panel');
+  panel.style.display = 'none';
+  panel.innerHTML = '';
   document.getElementById('trace-src').value = '';
   document.getElementById('trace-dst').value = '';
+  document.getElementById('info-content').innerHTML = '<div class="label">Выберите узел на графе</div>';
   if (network) network.selectNodes([], false);
+}
+
+// ─── ZONE DRILL-DOWN ──────────────────────────────
+function drillToZone(zone) {
+  if (!network || !zone) return;
+
+  // Save current state for "back" button
+  prevGraphState = {
+    nodeVisibility: {},
+    edgeVisibility: {},
+  };
+  allNodes.forEach(function(n) {
+    var visNode = network.body.data.nodes.get(n.id);
+    prevGraphState.nodeVisibility[n.id] = visNode ? !visNode.hidden : false;
+  });
+  allEdges.forEach(function(e) {
+    var visEdge = network.body.data.edges.get(e.id);
+    prevGraphState.edgeVisibility[e.id] = visEdge ? !visEdge.hidden : false;
+  });
+
+  // Find all nodes in this zone
+  var zoneNodeIds = allNodes.filter(function(n) { return n.group === zone; }).map(function(n) { return n.id; });
+  var zoneNodeSet = {};
+  zoneNodeIds.forEach(function(id) { zoneNodeSet[id] = true; });
+
+  // Find all neighbors of zone nodes
+  var neighborSet = {};
+  allEdges.forEach(function(e) {
+    if (zoneNodeSet[e.from] && !zoneNodeSet[e.to]) neighborSet[e.to] = true;
+    if (zoneNodeSet[e.to] && !zoneNodeSet[e.from]) neighborSet[e.from] = true;
+  });
+
+  // Hide all nodes NOT in zone OR neighbors
+  allNodes.forEach(function(n) {
+    var visible = zoneNodeSet[n.id] || neighborSet[n.id];
+    network.body.data.nodes.update({ id: n.id, hidden: !visible });
+  });
+
+  // Hide all edges that connect hidden nodes
+  allEdges.forEach(function(e) {
+    var fromNode = network.body.data.nodes.get(e.from);
+    var toNode = network.body.data.nodes.get(e.to);
+    var fromHidden = fromNode ? fromNode.hidden : false;
+    var toHidden = toNode ? toNode.hidden : false;
+    network.body.data.edges.update({ id: e.id, hidden: fromHidden || toHidden });
+  });
+
+  // Show breadcrumb
+  var bread = document.getElementById('drill-bread');
+  document.getElementById('drill-zone-name').textContent = zone;
+  bread.classList.add('visible');
+
+  // Fit to visible nodes
+  if (zoneNodeIds.length > 0) {
+    network.fit({ nodes: zoneNodeIds, animation: { duration: 500, easingFunction: 'easeInOutQuad' } });
+  }
+}
+
+function resetDrillDown() {
+  if (!network || !prevGraphState) return;
+
+  var ns = prevGraphState.nodeVisibility;
+  var es = prevGraphState.edgeVisibility;
+
+  allNodes.forEach(function(n) {
+    network.body.data.nodes.update({ id: n.id, hidden: !(ns[n.id] !== false) });
+  });
+  allEdges.forEach(function(e) {
+    network.body.data.edges.update({ id: e.id, hidden: !(es[e.id] !== false) });
+  });
+
+  document.getElementById('drill-bread').classList.remove('visible');
+  prevGraphState = null;
+  network.fit({ animation: { duration: 500, easingFunction: 'easeInOutQuad' } });
 }
 
 // ─── CONTEXT MENU ────────────────────────────────────
@@ -1245,6 +1577,18 @@ function initTabNav() {
       // Trigger render for optimizer tab
       if (btn.dataset.tab === 'tab-optimizer') {
         renderOptimizer();
+      }
+      // Trigger render for matrix tab
+      if (btn.dataset.tab === 'tab-matrix') {
+        renderMatrix();
+      }
+      // Trigger render for sankey tab
+      if (btn.dataset.tab === 'tab-sankey') {
+        loadSankey();
+      }
+      // Trigger render for hilbert tab
+      if (btn.dataset.tab === 'tab-hilbert') {
+        loadHilbert();
       }
     });
   });
@@ -1612,6 +1956,92 @@ function renderQuality() {
     });
 }
 
+function renderMatrix() {
+  var container = document.getElementById('matrix-content');
+  if (!container) return;
+  container.innerHTML = '<div style="text-align:center;padding:10px;color:var(--text2);">Загрузка матрицы зон...</div>';
+
+  fetch('/api/zone-matrix')
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (!data.zones || data.zones.length === 0) {
+        container.innerHTML = '<div class="item"><div class="label">Нет данных о зонах безопасности</div></div>';
+        return;
+      }
+
+      var zones = data.zones;
+      var cells = data.cells;
+      var isDark = document.body.classList.contains('light') ? false : true;
+
+      var bgColor = isDark ? '#16213e' : '#fff';
+      var textColor = isDark ? '#ddd' : '#333';
+      var headerBg = isDark ? '#0f3460' : '#667eea';
+      var headerColor = '#fff';
+      var borderColor = isDark ? '#0f3460' : '#ddd';
+
+      var html = '<table style="border-collapse:collapse;font-size:11px;font-family:Segoe UI,sans-serif;width:100%;">';
+      html += '<thead><tr><th style="background:' + headerBg + ';color:' + headerColor + ';padding:6px 8px;position:sticky;top:0;z-index:2;">Src \\ Dst</th>';
+      for (var i = 0; i < zones.length; i++) {
+        html += '<th style="background:' + headerBg + ';color:' + headerColor + ';padding:6px 8px;position:sticky;top:0;z-index:2;min-width:90px;text-align:center;">' + zones[i] + '</th>';
+      }
+      html += '</tr></thead><tbody>';
+
+      for (var ri = 0; ri < zones.length; ri++) {
+        var srcZone = zones[ri];
+        html += '<tr><th style="background:' + headerBg + ';color:' + headerColor + ';padding:6px 8px;position:sticky;left:0;z-index:1;text-align:right;">' + srcZone + '</th>';
+        for (var ci = 0; ci < zones.length; ci++) {
+          var dstZone = zones[ci];
+          var key = srcZone + '|||' + dstZone;
+          var cell = cells[key];
+          var isDiagonal = (srcZone === dstZone);
+
+          var cellBg = bgColor;
+          var cellText = '';
+
+          if (cell && cell.total > 0) {
+            var avgRisk = cell.avgRisk || 0;
+            if (!isDiagonal) {
+              if (avgRisk >= 7) cellBg = 'rgba(255,68,68,0.25)';
+              else if (avgRisk >= 4) cellBg = 'rgba(255,204,0,0.25)';
+              else cellBg = 'rgba(39,174,96,0.25)';
+            }
+            cellText = '<b>' + cell.total + '</b><br><span style="font-size:9px;">' +
+              '<span style="color:#27ae60;">✓' + cell.accept + '</span> ' +
+              '<span style="color:#e74c3c;">✗' + cell.deny + '</span></span>';
+          }
+
+          if (isDiagonal) {
+            cellBg = isDark ? '#1a1a2e' : '#f0f0f0';
+            cellText = '<span style="color:#999;font-size:10px;">intra-zone</span>';
+          }
+
+          var tooltip = 'Из ' + srcZone + ' в ' + dstZone;
+          if (cell && cell.total > 0) {
+            tooltip += '\nВсего: ' + cell.total + ' | Accept: ' + cell.accept + ' | Deny: ' + cell.deny + ' | Avg Risk: ' + (cell.avgRisk || 0);
+            if (cell.ruleNames && cell.ruleNames.length > 0) {
+              tooltip += '\nПравила: ' + cell.ruleNames.join(', ');
+            }
+          }
+
+          html += '<td style="border:1px solid ' + borderColor + ';padding:6px;text-align:center;' +
+            'cursor:pointer;background:' + cellBg + ';color:' + textColor + ';' +
+            'min-width:90px;transition:background 0.15s;' +
+            'font-family:Segoe UI,sans-serif;' +
+            '" onmouseover="this.style.filter=\'brightness(1.2)\';" onmouseout="this.style.filter=\'\';"' +
+            ' title="' + tooltip + '"' +
+            ' onclick="alert(\'' + tooltip.replace(/\\n/g, '\\n') + '\')">' +
+            cellText + '</td>';
+        }
+        html += '</tr>';
+      }
+      html += '</tbody></table>';
+      container.innerHTML = html;
+    })
+    .catch(function() {
+      container.innerHTML = '<div class="item"><div class="label" style="color:#e94560;">Ошибка загрузки матрицы зон</div></div>';
+    });
+}
+
 function showNodeInfo(nodeId) {
   var node = allNodes.find(function(n) { return n.id === nodeId; });
   if (!node) {
@@ -1817,7 +2247,14 @@ function drawDashboardCharts(data) {
       options: { responsive: true, maintainAspectRatio: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
     });
   }
+  // After dashboard charts, also load extra visualizations
+  setTimeout(function() {
+    loadRiskDonut();
+    loadServiceTable();
+  }, 200);
 }
+
+// ─── RISK DONUT (Canvas 2D) ─────────────────────────
 
 // ─── 7 TOPOLOGY MODES ────────────────────────────────
 var currentTopo = null;
@@ -2298,6 +2735,471 @@ renderSidebar = function() {
   loadDashboard();
   origRenderSidebar();
 };
+
+// ─── RISK DONUT (Canvas 2D) ─────────────────────────
+
+function loadRiskDonut() {
+  fetch('/api/risk-severity')
+    .then(function(r) { return r.json(); })
+    .then(function(data) { drawRiskDonut(data); })
+    .catch(function(e) {
+      document.getElementById('risk-donut-container').innerHTML =
+        '<h4>🎯 Risk Severity</h4><div class="label" style="color:#e94560;">Ошибка загрузки: ' + e + '</div>';
+    });
+}
+
+function drawRiskDonut(data) {
+  if (!data || !data.length) {
+    document.getElementById('risk-donut-container').innerHTML =
+      '<h4>🎯 Risk Severity</h4><div class="label">Нет данных</div>';
+    return;
+  }
+  var canvas = document.getElementById('risk-donut');
+  if (!canvas) return;
+
+  // Set canvas size based on container
+  var container = canvas.parentElement;
+  var w = container.clientWidth - 20;
+  var h = Math.min(w, 250);
+  canvas.width = w * (window.devicePixelRatio || 1);
+  canvas.height = h * (window.devicePixelRatio || 1);
+  canvas.style.width = w + 'px';
+  canvas.style.height = h + 'px';
+
+  var ctx = canvas.getContext('2d');
+  var dpr = window.devicePixelRatio || 1;
+  ctx.scale(dpr, dpr);
+
+  var cx = w / 2, cy = h / 2;
+  var outerR = Math.min(cx, cy) - 10;
+  var innerR = outerR * 0.55;
+
+  var total = data.reduce(function(s, d) { return s + d.count; }, 0);
+  var startAngle = -Math.PI / 2;
+
+  data.forEach(function(d) {
+    var sliceAngle = (d.count / total) * 2 * Math.PI;
+    ctx.beginPath();
+    ctx.moveTo(cx + innerR * Math.cos(startAngle), cy + innerR * Math.sin(startAngle));
+    ctx.arc(cx, cy, outerR, startAngle, startAngle + sliceAngle);
+    ctx.arc(cx, cy, innerR, startAngle + sliceAngle, startAngle, true);
+    ctx.closePath();
+    ctx.fillStyle = d.color || '#666';
+    ctx.fill();
+
+    // Label in center of slice
+    var midAngle = startAngle + sliceAngle / 2;
+    var labelR = outerR * 0.78;
+    var lx = cx + labelR * Math.cos(midAngle);
+    var ly = cy + labelR * Math.sin(midAngle);
+    if (d.percentage > 0) {
+      ctx.fillStyle = '#fff';
+      ctx.font = 'bold 10px "Segoe UI", system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      var pctText = Math.round(d.percentage) + '%';
+      ctx.fillText(pctText, lx, ly);
+    }
+
+    startAngle += sliceAngle;
+  });
+
+  // Center text
+  ctx.fillStyle = getComputedStyle(document.body).getPropertyValue('--text').trim() || '#e0e0e0';
+  ctx.font = 'bold 14px "Segoe UI", system-ui, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(total, cx, cy - 6);
+  ctx.font = '10px "Segoe UI", system-ui, sans-serif';
+  ctx.fillStyle = getComputedStyle(document.body).getPropertyValue('--text2').trim() || '#a0a0a0';
+  ctx.fillText('Total', cx, cy + 10);
+
+  // Legend
+  var legendEl = document.getElementById('donut-legend');
+  if (legendEl) {
+    var legendHtml = '';
+    data.forEach(function(d) {
+      legendHtml += '<span class="dl-item"><span class="dl-swatch" style="background:' + d.color + ';"></span>' + escapeHtml(d.severity) + ' (' + d.count + ')</span>';
+    });
+    legendEl.innerHTML = legendHtml;
+  }
+}
+
+// ─── SERVICE TABLE ───────────────────────────────────
+
+function loadServiceTable() {
+  fetch('/api/services')
+    .then(function(r) { return r.json(); })
+    .then(function(data) { renderServiceTable(data); })
+    .catch(function(e) {
+      document.getElementById('service-table').innerHTML =
+        '<div class="label" style="color:#e94560;">Ошибка загрузки: ' + e + '</div>';
+    });
+}
+
+function renderServiceTable(data) {
+  var container = document.getElementById('service-table');
+  if (!container) return;
+  if (!data || !data.length) {
+    container.innerHTML = '<div class="label">Нет данных о сервисах</div>';
+    return;
+  }
+
+  // Sort by count descending, take top 15
+  var sorted = data.slice().sort(function(a, b) { return b.count - a.count; }).slice(0, 15);
+  var maxCount = sorted.length ? sorted[0].count : 1;
+
+  var html = '<table class="svc-table">';
+  html += '<thead><tr><th>Название</th><th>Кол-во</th><th>Протокол</th><th>%</th><th></th></tr></thead>';
+  html += '<tbody>';
+  sorted.forEach(function(s) {
+    var barW = Math.round((s.count / maxCount) * 100);
+    html += '<tr>';
+    html += '<td><b>' + escapeHtml(s.name || '?') + '</b></td>';
+    html += '<td>' + s.count + '</td>';
+    html += '<td>' + escapeHtml(s.protocol || 'any') + '</td>';
+    html += '<td>' + (s.percentage ? s.percentage.toFixed(1) + '%' : '-') + '</td>';
+    html += '<td class="bar-cell"><div class="bar-bg"><div class="bar-fill" style="width:' + barW + '%"></div></div></td>';
+    html += '</tr>';
+  });
+  html += '</tbody></table>';
+  container.innerHTML = html;
+}
+
+// ─── SANKEY DIAGRAM (Canvas 2D) ──────────────────────
+
+function loadSankey() {
+  fetch('/api/sankey')
+    .then(function(r) { return r.json(); })
+    .then(function(data) { renderSankey(data); })
+    .catch(function(e) {
+      var canvas = document.getElementById('sankey-canvas');
+      if (canvas) {
+        var ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#e94560';
+        ctx.font = '12px sans-serif';
+        ctx.fillText('Ошибка загрузки: ' + e, 20, 30);
+      }
+    });
+}
+
+function renderSankey(data) {
+  var canvas = document.getElementById('sankey-canvas');
+  if (!canvas) return;
+
+  var container = canvas.parentElement;
+  var w = container.clientWidth || 280;
+  var h = Math.max(400, container.clientHeight || 400);
+  var dpr = window.devicePixelRatio || 1;
+  canvas.width = w * dpr;
+  canvas.height = h * dpr;
+  canvas.style.width = w + 'px';
+  canvas.style.height = h + 'px';
+
+  var ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+
+  if (!data || !data.nodes || !data.nodes.length) {
+    ctx.fillStyle = getComputedStyle(document.body).getPropertyValue('--text2').trim() || '#a0a0a0';
+    ctx.font = '12px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('Нет данных для Sankey', w / 2, h / 2);
+    return;
+  }
+
+  var nodes = data.nodes;
+  var links = data.links || [];
+
+  // Calculate value totals per node (source and target)
+  var nodeSourceTotal = {};
+  var nodeTargetTotal = {};
+  links.forEach(function(l) {
+    var s = nodes[l.source];
+    var t = nodes[l.target];
+    nodeSourceTotal[s] = (nodeSourceTotal[s] || 0) + (l.value || 0);
+    nodeTargetTotal[t] = (nodeTargetTotal[t] || 0) + (l.value || 0);
+  });
+
+  // Identify source nodes (only appear as source) and target nodes (only appear as target)
+  var sourcesSet = {};
+  var targetsSet = {};
+  links.forEach(function(l) {
+    sourcesSet[l.source] = true;
+    targetsSet[l.target] = true;
+  });
+
+  var sourceNodes = [];
+  var targetNodes = [];
+  nodes.forEach(function(n, i) {
+    if (sourcesSet[i] && !targetsSet[i]) sourceNodes.push({ idx: i, name: n, total: nodeSourceTotal[n] || 0 });
+    if (targetsSet[i] && !sourcesSet[i]) targetNodes.push({ idx: i, name: n, total: nodeTargetTotal[n] || 0 });
+  });
+
+  // Fallback: if no clear split, use left half as source, right half as target
+  if (!sourceNodes.length || !targetNodes.length) {
+    var midIdx = Math.ceil(nodes.length / 2);
+    nodes.forEach(function(n, i) {
+      if (i < midIdx) {
+        sourceNodes.push({ idx: i, name: n, total: nodeSourceTotal[n] || nodeTargetTotal[n] || 1 });
+      } else {
+        targetNodes.push({ idx: i, name: n, total: nodeTargetTotal[n] || nodeSourceTotal[n] || 1 });
+      }
+    });
+  }
+
+  var padding = 10;
+  var leftX = padding;
+  var rightX = w - padding - 40;
+  var barW = 30;
+  var topY = 30;
+  var bottomY = h - 20;
+  var availH = bottomY - topY;
+
+  // Max total for scaling
+  var maxSourceTotal = sourceNodes.reduce(function(m, n) { return Math.max(m, n.total); }, 1);
+  var maxTargetTotal = targetNodes.reduce(function(m, n) { return Math.max(m, n.total); }, 1);
+  var globalMax = Math.max(maxSourceTotal, maxTargetTotal);
+
+  // Zone colors (consistent palette)
+  var zoneColors = [
+    '#3b82f6', '#10b981', '#f59e0b', '#e94560', '#8b5cf6',
+    '#06b6d4', '#ec4899', '#14b8a6', '#f97316', '#6366f1',
+    '#84cc16', '#ef4444', '#0ea5e9', '#a855f7', '#eab308'
+  ];
+
+  function getColor(idx) { return zoneColors[idx % zoneColors.length]; }
+
+  // Draw source bars
+  var srcPos = [];
+  var srcH = Math.max(10, availH / sourceNodes.length - 4);
+  if (sourceNodes.length > 20) srcH = Math.max(6, availH / sourceNodes.length - 2);
+
+  sourceNodes.forEach(function(n, i) {
+    var y = topY + i * (srcH + 4);
+    var barH = srcH;
+    srcPos.push({ y: y, h: barH, node: n });
+
+    // Bar
+    ctx.fillStyle = getColor(n.idx);
+    ctx.fillRect(leftX, y, barW, barH);
+
+    // Label
+    ctx.fillStyle = getComputedStyle(document.body).getPropertyValue('--text').trim() || '#e0e0e0';
+    ctx.font = (srcH > 12 ? '10px' : '8px') + ' sans-serif';
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(n.name, leftX - 4, y + barH / 2);
+  });
+
+  // Draw target bars
+  var tgtPos = [];
+  var tgtH = Math.max(10, availH / targetNodes.length - 4);
+  if (targetNodes.length > 20) tgtH = Math.max(6, availH / targetNodes.length - 2);
+
+  targetNodes.forEach(function(n, i) {
+    var y = topY + i * (tgtH + 4);
+    var barH = tgtH;
+    tgtPos.push({ y: y, h: barH, node: n });
+
+    ctx.fillStyle = getColor(n.idx);
+    ctx.fillRect(rightX, y, barW, barH);
+
+    ctx.fillStyle = getComputedStyle(document.body).getPropertyValue('--text').trim() || '#e0e0e0';
+    ctx.font = (tgtH > 12 ? '10px' : '8px') + ' sans-serif';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(n.name, rightX + barW + 4, y + barH / 2);
+  });
+
+  // Draw links
+  links.forEach(function(l) {
+    var srcN = sourceNodes.find(function(sn) { return sn.idx === l.source; });
+    var tgtN = targetNodes.find(function(tn) { return tn.idx === l.target; });
+
+    var srcI = srcN ? sourceNodes.indexOf(srcN) : -1;
+    var tgtI = tgtN ? targetNodes.indexOf(tgtN) : -1;
+    if (srcI < 0 || tgtI < 0) return;
+
+    var sy = srcPos[srcI].y + srcPos[srcI].h / 2;
+    var ty = tgtPos[tgtI].y + tgtPos[tgtI].h / 2;
+
+    var lineW = Math.max(1, Math.min(20, (l.value || 1) / Math.max(globalMax, 1) * 20));
+    ctx.strokeStyle = getColor(l.source);
+    ctx.globalAlpha = 0.35;
+    ctx.lineWidth = lineW;
+    ctx.beginPath();
+    ctx.moveTo(leftX + barW, sy);
+    ctx.bezierCurveTo(
+      (leftX + barW + rightX) / 2, sy,
+      (leftX + barW + rightX) / 2, ty,
+      rightX, ty
+    );
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+  });
+
+  // Legend
+  var legendEl = document.getElementById('sankey-legend');
+  if (legendEl) {
+    var allNodeNames = [];
+    sourceNodes.forEach(function(n) { allNodeNames.push({ idx: n.idx, name: n.name }); });
+    targetNodes.forEach(function(n) {
+      if (!allNodeNames.find(function(a) { return a.idx === n.idx; })) {
+        allNodeNames.push({ idx: n.idx, name: n.name });
+      }
+    });
+    var legendHtml = '';
+    allNodeNames.forEach(function(n) {
+      legendHtml += '<span style="margin-right:8px;"><span class="swatch" style="background:' + getColor(n.idx) + ';"></span>' + escapeHtml(n.name) + '</span>';
+    });
+    legendEl.innerHTML = legendHtml;
+  }
+}
+
+// ─── HILBERT IP MAP (Canvas 2D) ──────────────────────
+
+function loadHilbert() {
+  fetch('/api/hilbert')
+    .then(function(r) { return r.json(); })
+    .then(function(data) { renderHilbert(data); })
+    .catch(function(e) {
+      var canvas = document.getElementById('hilbert-canvas');
+      if (canvas) {
+        var ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#e94560';
+        ctx.font = '12px sans-serif';
+        ctx.fillText('Ошибка загрузки: ' + e, 20, 30);
+      }
+    });
+}
+
+function renderHilbert(data) {
+  var canvas = document.getElementById('hilbert-canvas');
+  if (!canvas) return;
+
+  var container = canvas.parentElement;
+  var w = container.clientWidth || 280;
+  var h = Math.max(400, container.clientHeight || 400);
+  var dpr = window.devicePixelRatio || 1;
+  canvas.width = w * dpr;
+  canvas.height = h * dpr;
+  canvas.style.width = w + 'px';
+  canvas.style.height = h + 'px';
+
+  var ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+
+  if (!data || !data.points || !data.points.length) {
+    ctx.fillStyle = getComputedStyle(document.body).getPropertyValue('--text2').trim() || '#a0a0a0';
+    ctx.font = '12px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('Нет данных для Hilbert карты', w / 2, h / 2);
+    return;
+  }
+
+  var gridSize = data.gridSize || 4096;
+  var padding = 10;
+  var mapW = w - padding * 2;
+  var mapH = h - padding * 2;
+  var scale = Math.min(mapW, mapH) / gridSize;
+
+  // Zone colors
+  var zoneColorMap = {};
+  var palette = [
+    '#3b82f6', '#10b981', '#f59e0b', '#e94560', '#8b5cf6',
+    '#06b6d4', '#ec4899', '#14b8a6', '#f97316', '#6366f1',
+    '#84cc16', '#ef4444', '#0ea5e9', '#a855f7', '#eab308',
+    '#22c55e', '#64748b', '#dc2626', '#d946ef', '#65a30d'
+  ];
+  var zoneIdx = 0;
+  data.points.forEach(function(p) {
+    if (!zoneColorMap[p.zone]) {
+      zoneColorMap[p.zone] = palette[zoneIdx % palette.length];
+      zoneIdx++;
+    }
+  });
+
+  // Store point data for hover
+  var pointRects = [];
+
+  // Draw points
+  data.points.forEach(function(p) {
+    var px = padding + p.x * scale;
+    var py = padding + p.y * scale;
+    var riskScore = p.risk_score || 1;
+    var r = Math.max(2, Math.min(12, riskScore * 1.5));
+    var color = zoneColorMap[p.zone] || '#888';
+
+    ctx.fillStyle = color;
+    ctx.globalAlpha = 0.8;
+    ctx.beginPath();
+    ctx.arc(px, py, r, 0, 2 * Math.PI);
+    ctx.fill();
+
+    // Border
+    ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+    ctx.lineWidth = 0.5;
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+
+    pointRects.push({ px: px, py: py, r: r, data: p });
+  });
+
+  // Hover handler
+  var tooltip = document.getElementById('hilbert-tooltip');
+  if (!tooltip) return;
+
+  canvas.onmousemove = function(e) {
+    var rect = canvas.getBoundingClientRect();
+    var mx = (e.clientX - rect.left);
+    var my = (e.clientY - rect.top);
+
+    var found = null;
+    for (var i = pointRects.length - 1; i >= 0; i--) {
+      var pr = pointRects[i];
+      var dx = mx - pr.px;
+      var dy = my - pr.py;
+      if (dx * dx + dy * dy <= pr.r * pr.r * 2) {
+        found = pr;
+        break;
+      }
+    }
+
+    if (found) {
+      var d = found.data;
+      tooltip.innerHTML = '<b>' + escapeHtml(d.node_name || d.ip) + '</b><br>Zone: ' + escapeHtml(d.zone || '?') + '<br>Risk: ' + (d.risk_score || 0) + '<br>CIDR: ' + escapeHtml(d.cidr || d.ip);
+      tooltip.style.display = 'block';
+      tooltip.style.left = (e.clientX - canvas.getBoundingClientRect().left + 12) + 'px';
+      tooltip.style.top = (e.clientY - canvas.getBoundingClientRect().top - 40) + 'px';
+      canvas.style.cursor = 'pointer';
+    } else {
+      tooltip.style.display = 'none';
+      canvas.style.cursor = 'default';
+    }
+  };
+
+  canvas.onmouseleave = function() {
+    tooltip.style.display = 'none';
+    canvas.style.cursor = 'default';
+  };
+
+  // Draw legend
+  ctx.font = '9px sans-serif';
+  var lx = padding;
+  var ly = h - 8;
+  var legendKeys = Object.keys(zoneColorMap).slice(0, 12);
+  legendKeys.forEach(function(zone) {
+    var color = zoneColorMap[zone];
+    ctx.fillStyle = color;
+    ctx.fillRect(lx, ly - 6, 8, 8);
+    ctx.fillStyle = getComputedStyle(document.body).getPropertyValue('--text').trim() || '#e0e0e0';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'bottom';
+    var label = zone.length > 8 ? zone.substring(0, 8) + '..' : zone;
+    ctx.fillText(label, lx + 10, ly);
+    lx += ctx.measureText(label).width + 20;
+  });
+}
 </script>
 
 <!-- Dependencies via CDN -->
