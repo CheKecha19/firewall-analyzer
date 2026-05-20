@@ -265,6 +265,23 @@ def get_dashboard_json(
         temporal_data=temporal_data, config_diffs=config_diffs,
         attack_graph_data=attack_graph_data,
     )
+    # ── Allow/Deny breakdown ──
+    allow_count = sum(1 for r in rules if r.get("action", "").lower() in ("allow", "permit"))
+    deny_count = sum(1 for r in rules if r.get("action", "").lower() in ("deny", "drop", "block"))
+    unimplemented = len(rules) - allow_count - deny_count
+    allow_deny_breakdown = {
+        "Allow": allow_count, "Deny": deny_count,
+        **({"Other": unimplemented} if unimplemented > 0 else {})
+    }
+
+    # ── Severity counts from issues ──
+    severity_counts = {
+        "Критические": len([i for i in issues if i.get("severity") == "critical"]),
+        "Высокие": len([i for i in issues if i.get("severity") == "high"]),
+        "Средние": len([i for i in issues if i.get("severity") == "medium"]),
+        "Низкие": len([i for i in issues if i.get("severity") == "low"]),
+    }
+
     return {
         "kpis": [{
             "name": k.name, "value": k.value, "label": k.label,
@@ -282,6 +299,8 @@ def get_dashboard_json(
         } for c in data.top_changes],
         "security_score_breakdown": data.security_score_breakdown,
         "rules_health_breakdown": data.rules_health_breakdown,
+        "allow_deny_breakdown": allow_deny_breakdown,
+        "severity_counts": severity_counts,
         "trend_data": data.trend_data,
         "timestamp": data.timestamp,
     }

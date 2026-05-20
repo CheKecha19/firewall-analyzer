@@ -59,6 +59,10 @@ features = {
     'Dashboard loading': 'dashboard' in all_js.lower(),
     'Branding loading': 'branding' in all_js.lower(),
     'search with debounce': 'setTimeout' in all_js and 'search' in all_js.lower(),
+    'Rule quality (renderQuality)': 'renderQuality' in all_js,
+    'Quality sub-tabs': 'quality-subtab-bar' in html,
+    'Quality stat mini-cards': 'quality-stats-row' in html,
+    'Quality click-to-highlight': '_qHighlightRule' in all_js,
 }
 for name, ok in features.items():
     print(f"  [{'OK' if ok else 'MISS'}] {name}")

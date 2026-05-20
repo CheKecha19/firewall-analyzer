@@ -359,6 +359,40 @@ path-panel .hop.accepted { background: #27ae60; color: #fff; border-color: #1e84
 .ql-badge.redundant { background: #3b82f6; color: #fff; }
 .ql-badge.unused { background: #6b7280; color: #fff; }
 
+/* ── Quality sub-tab bar ── */
+.quality-subtab-bar {
+  display: flex; gap: 2px; margin-bottom: 10px; flex-wrap: wrap;
+}
+.quality-subtab-bar button {
+  background: var(--bg3); border: 1px solid var(--border); color: var(--text2);
+  padding: 4px 10px; border-radius: 4px; cursor: pointer; font-size: 11px;
+  transition: background 0.2s;
+}
+.quality-subtab-bar button:hover { background: var(--accent); color: #fff; }
+.quality-subtab-bar button.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+/* ── Quality stat mini-cards ── */
+.quality-stats-row {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: 6px; margin-bottom: 10px;
+}
+.quality-stat-mini {
+  background: var(--card-bg); border-radius: 6px; border: 1px solid var(--border);
+  padding: 8px 10px; text-align: center; cursor: pointer;
+  transition: box-shadow 0.2s;
+}
+.quality-stat-mini:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.15); }
+.quality-stat-mini .qs-count { font-size: 22px; font-weight: 700; }
+.quality-stat-mini .qs-label { font-size: 10px; color: var(--text2); margin-top: 2px; }
+.quality-stat-mini.shadowed .qs-count { color: #f59e0b; }
+.quality-stat-mini.conflict .qs-count { color: #e94560; }
+.quality-stat-mini.redundant .qs-count { color: #3b82f6; }
+.quality-stat-mini.unused .qs-count { color: #6b7280; }
+
+/* ── Quality card clickable ── */
+.quality-card.clickable { cursor: pointer; transition: box-shadow 0.15s; }
+.quality-card.clickable:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.2); }
+
 /* Dashboard KPI Cards */
 #dashboard-content { padding: 8px; }
 .kpi-grid {
@@ -380,9 +414,27 @@ path-panel .hop.accepted { background: #27ae60; color: #fff; border-color: #1e84
 .kpi-card .kpi-value { font-size: 28px; font-weight: 700; color: var(--accent); }
 .kpi-card .kpi-label { font-size: 11px; color: var(--text2); margin-top: 4px; }
 .kpi-card .kpi-trend { font-size: 12px; margin-top: 4px; }
+.kpi-card.clickable { cursor: pointer; }
 .kpi-trend.up { color: #10b981; }
 .kpi-trend.down { color: #e94560; }
 .kpi-trend.flat { color: var(--text2); }
+
+/* Dashboard Quick Actions */
+.dash-actions {
+  display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px;
+}
+.dash-action-btn {
+  background: var(--bg3); border: 1px solid var(--border); color: var(--accent);
+  padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 12px;
+  transition: background 0.2s, border-color 0.2s;
+}
+.dash-action-btn:hover { background: var(--hover-bg); border-color: var(--accent); }
+
+/* Chart row for side-by-side charts */
+.chart-row {
+  display: flex; gap: 10px; margin-bottom: 10px;
+}
+.chart-row .chart-container { flex: 1; min-width: 0; }
 
 .chart-container {
   background: var(--card-bg);
@@ -593,6 +645,15 @@ path-panel .hop.accepted { background: #27ae60; color: #fff; border-color: #1e84
   font-size: 12px; margin-top: 8px;
 }
 .opt-export-btn:hover { filter: brightness(1.2); }
+
+/* What-If form */
+.whatif-form {
+  background: var(--card-bg); border: 1px solid var(--border);
+  border-radius: 8px; padding: 12px; margin-bottom: 10px;
+}
+.whatif-form h4 {
+  color: var(--accent); margin: 0 0 8px 0;
+}
 </style>
 </head>
 <body>
@@ -670,6 +731,7 @@ path-panel .hop.accepted { background: #27ae60; color: #fff; border-color: #1e84
       <button data-tab="tab-matrix">🔲 Матрица</button>
       <button data-tab="tab-sankey">🌊 Sankey</button>
       <button data-tab="tab-hilbert">🗺️ Hilbert</button>
+      <button data-tab="tab-whatif">🧪 What-If</button>
     </div>
     <div class="tab-content active" id="tab-dashboard">
       <div id="dashboard-content" style="font-size:12px;color:var(--text2);">Загрузка дашборда...</div>
@@ -720,6 +782,25 @@ path-panel .hop.accepted { background: #27ae60; color: #fff; border-color: #1e84
           </button>
           <div class="label" style="margin-top:8px;">Нажмите для загрузки предпросмотра оптимизации правил</div>
         </div>
+      </div>
+    </div>
+    <div class="tab-content" id="tab-whatif">
+      <div id="whatif-content" style="font-size:12px;color:var(--text2);padding:10px;">
+        <div class="whatif-form">
+          <h4 style="font-size:13px;margin-bottom:8px;">🧪 Симуляция изменений правил</h4>
+          <div style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap;">
+            <select id="whatif-type" style="background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:4px;padding:4px 8px;font-size:12px;">
+              <option value="add">Добавить правило</option>
+              <option value="remove">Удалить правило</option>
+              <option value="change_action">Изменить действие</option>
+            </select>
+            <input id="whatif-rule-name" placeholder="Имя правила" style="background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:4px;padding:4px 8px;font-size:12px;flex:1;min-width:120px;">
+            <input id="whatif-new-value" placeholder="Новое значение (permit/deny)" style="background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:4px;padding:4px 8px;font-size:12px;flex:1;min-width:130px;">
+            <button onclick="renderWhatIf()" style="background:var(--accent);color:#fff;border:none;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:12px;">▶ Симулировать</button>
+          </div>
+          <div class="label" style="margin-bottom:8px;">Введите параметры изменения и нажмите «Симулировать»</div>
+        </div>
+        <div id="whatif-result" style="margin-top:8px;"></div>
       </div>
     </div>
     <div class="tab-content" id="tab-search">
@@ -1751,6 +1832,15 @@ function cmAction(action) {
 }
 
 // ─── SIDEBAR ─────────────────────────────────────────
+function switchTab(tabId) {
+  document.querySelectorAll('.tab-nav button').forEach(function(b) { b.classList.remove('active'); });
+  var btn = document.querySelector('.tab-nav button[data-tab="' + tabId + '"]');
+  if (btn) btn.classList.add('active');
+  document.querySelectorAll('.tab-content').forEach(function(tc) { tc.classList.remove('active'); });
+  var tab = document.getElementById(tabId);
+  if (tab) tab.classList.add('active');
+}
+
 function initTabNav() {
   document.querySelectorAll('.tab-nav button').forEach(function(btn) {
     btn.addEventListener('click', function() {
@@ -2140,91 +2230,199 @@ function renderQuality() {
     .then(function(data) {
       var score = data.quality_score || 100;
       var scoreClass = score >= 80 ? 'good' : score >= 50 ? 'warn' : 'bad';
-
       var summary = data.summary || {};
+      var shadowed = data.shadowed || [];
+      var conflicts = data.conflicts || [];
+      var redundant = data.redundant || [];
+      var unused = data.unused || [];
+
+      // ── Header: score + stat mini-cards ──
       var html = '<div class="quality-header">';
       html += '<div class="quality-score ' + scoreClass + '">' + score + '</div>';
       html += '<div class="quality-summary">';
       html += '<div><b>Индекс качества правил</b></div>';
       html += '<div>Всего правил: <b>' + (data.total_rules || 0) + '</b></div>';
-      html += '<div>Shadowed: <b style="color:#f59e0b;">' + (summary.shadowed_rules || 0) + '</b> | ';
-      html += 'Conflicts: <b style="color:#e94560;">' + (summary.conflicts || 0) + '</b> | ';
-      html += 'Redundant: <b style="color:#3b82f6;">' + (summary.redundant_rules || 0) + '</b> | ';
-      html += 'Unused: <b style="color:#6b7280;">' + (summary.unused_rules || 0) + '</b>';
-      html += '</div>';
+      html += '</div></div>';
+
+      // ── Stat mini-cards row ──
+      html += '<div class="quality-stats-row">';
+      html += _qualityStatCard('shadowed', '🔽 Shadowed', shadowed.length);
+      html += _qualityStatCard('conflict', '⚡ Conflicts', conflicts.length);
+      html += _qualityStatCard('redundant', '🔄 Redundant', redundant.length);
+      html += _qualityStatCard('unused', '📭 Unused', unused.length);
       html += '</div>';
 
-      // Shadowed rules
-      var shadowed = data.shadowed || [];
-      if (shadowed.length > 0) {
-        html += '<div style="font-weight:600;color:#f59e0b;margin:8px 0 4px;">🔽 Перекрытые правила (' + shadowed.length + ')</div>';
-        for (var i = 0; i < Math.min(shadowed.length, 10); i++) {
-          var s = shadowed[i];
-          html += '<div class="quality-card shadowed">';
-          html += '<span class="ql-badge shadowed">SHADOWED</span>';
-          html += '<b>' + escapeHtml(s.shadowed_name || '?') + '</b>';
-          html += '<div style="color:var(--text2);font-size:11px;">Перекрыто: ' + escapeHtml(s.shadower_name || '?') + '</div>';
-          html += '<div style="color:var(--text2);font-size:10px;">' + escapeHtml(s.reason || '') + '</div>';
-          html += '</div>';
-        }
-      } else {
-        html += '<div style="color:#10b981;font-size:12px;margin:6px 0;">✓ Нет перекрытых правил</div>';
-      }
+      // ── Sub-tab bar ──
+      html += '<div class="quality-subtab-bar" id="quality-subtabs">';
+      html += '<button class="active" data-qtab="all">Все</button>';
+      html += '<button data-qtab="shadowed">🔽 Shadowed</button>';
+      html += '<button data-qtab="conflict">⚡ Conflicts</button>';
+      html += '<button data-qtab="redundant">🔄 Redundant</button>';
+      html += '<button data-qtab="unused">📭 Unused</button>';
+      html += '</div>';
+
+      // ── Content sections (visible/hidden via sub-tab toggle) ──
+      html += '<div id="quality-content-all" class="q-section">';
+
+      // Shadowed
+      html += '<div id="qsec-shadowed" class="q-section">';
+      html += _renderShadowedSection(shadowed);
+      html += '</div>';
 
       // Conflicts
-      var conflicts = data.conflicts || [];
-      if (conflicts.length > 0) {
-        html += '<div style="font-weight:600;color:#e94560;margin:8px 0 4px;">⚡ Конфликты (' + conflicts.length + ')</div>';
-        for (var i = 0; i < Math.min(conflicts.length, 10); i++) {
-          var c = conflicts[i];
-          html += '<div class="quality-card conflict">';
-          html += '<span class="ql-badge conflict">CONFLICT</span>';
-          html += '<b>' + escapeHtml(c.rule_a || '?') + '</b> (' + escapeHtml(c.rule_a_action || '?') + ') ↔ ';
-          html += '<b>' + escapeHtml(c.rule_b || '?') + '</b> (' + escapeHtml(c.rule_b_action || '?') + ')';
-          html += '<div style="color:var(--text2);font-size:10px;">' + escapeHtml(c.scope_description || '') + '</div>';
-          html += '</div>';
-        }
-      } else {
-        html += '<div style="color:#10b981;font-size:12px;margin:6px 0;">✓ Нет конфликтов</div>';
-      }
+      html += '<div id="qsec-conflict" class="q-section">';
+      html += _renderConflictSection(conflicts);
+      html += '</div>';
 
-      // Redundant rules
-      var redundant = data.redundant || [];
-      if (redundant.length > 0) {
-        html += '<div style="font-weight:600;color:#3b82f6;margin:8px 0 4px;">🔄 Избыточные правила (' + redundant.length + ')</div>';
-        for (var i = 0; i < Math.min(redundant.length, 10); i++) {
-          var r = redundant[i];
-          html += '<div class="quality-card redundant">';
-          html += '<span class="ql-badge redundant">' + (r.count || '?') + 'x REDUNDANT</span>';
-          html += escapeHtml((r.rules || []).join(', '));
-          html += '</div>';
-        }
-      } else {
-        html += '<div style="color:#10b981;font-size:12px;margin:6px 0;">✓ Нет избыточных правил</div>';
-      }
+      // Redundant
+      html += '<div id="qsec-redundant" class="q-section">';
+      html += _renderRedundantSection(redundant);
+      html += '</div>';
 
-      // Unused rules
-      var unused = data.unused || [];
-      if (unused.length > 0) {
-        html += '<div style="font-weight:600;color:#6b7280;margin:8px 0 4px;">📭 Неиспользуемые/неизвестные правила (' + unused.length + ')</div>';
-        for (var i = 0; i < Math.min(unused.length, 15); i++) {
-          var u = unused[i];
-          var uStatus = u.status === 'unused' ? 'UNUSED' : u.status === 'low_hits' ? 'LOW HITS' : 'UNKNOWN';
-          var uBadgeClass = u.status === 'unused' ? 'unused' : u.status === 'low_hits' ? 'shadowed' : 'unused';
-          html += '<div class="quality-card unused">';
-          html += '<span class="ql-badge ' + uBadgeClass + '">' + uStatus + '</span>';
-          html += escapeHtml(u.rule_name || '?');
-          html += '</div>';
-        }
-      } else {
-        html += '<div style="color:#10b981;font-size:12px;margin:6px 0;">✓ Все правила используются</div>';
-      }
+      // Unused
+      html += '<div id="qsec-unused" class="q-section">';
+      html += _renderUnusedSection(unused);
+      html += '</div>';
+
+      html += '</div>';
 
       container.innerHTML = html;
+
+      // ── Bind sub-tab click handlers ──
+      var subtabBar = document.getElementById('quality-subtabs');
+      if (subtabBar) {
+        subtabBar.querySelectorAll('button').forEach(function(btn) {
+          btn.addEventListener('click', function() {
+            subtabBar.querySelectorAll('button').forEach(function(b) { b.classList.remove('active'); });
+            btn.classList.add('active');
+            var qtab = btn.dataset.qtab;
+            document.querySelectorAll('#tab-quality .q-section').forEach(function(sec) { sec.style.display = 'none'; });
+            if (qtab === 'all') {
+              document.querySelectorAll('#tab-quality .q-section').forEach(function(sec) { sec.style.display = ''; });
+            } else {
+              var el = document.getElementById('qsec-' + qtab);
+              if (el) el.style.display = '';
+            }
+          });
+        });
+      }
     })
     .catch(function() {
       container.innerHTML = '<div class="item"><div class="label" style="color:#e94560;">Ошибка загрузки анализа качества</div></div>';
     });
+}
+
+// ── Quality helpers ──
+
+function _qualityStatCard(type, label, count) {
+  return '<div class="quality-stat-mini ' + type + '" onclick="_qFilterClick(\'' + type + '\')">' +
+    '<div class="qs-count">' + count + '</div>' +
+    '<div class="qs-label">' + label + '</div></div>';
+}
+
+function _qFilterClick(type) {
+  var bar = document.getElementById('quality-subtabs');
+  if (!bar) return;
+  bar.querySelectorAll('button').forEach(function(b) { b.classList.remove('active'); });
+  var btn = bar.querySelector('[data-qtab="' + type + '"]');
+  if (btn) btn.classList.add('active');
+  document.querySelectorAll('#tab-quality .q-section').forEach(function(sec) { sec.style.display = 'none'; });
+  var el = document.getElementById('qsec-' + type);
+  if (el) el.style.display = '';
+}
+
+function _qHighlightRule(ruleName) {
+  // Highlight on graph
+  if (typeof focusNode === 'function') {
+    focusNode(ruleName);
+  }
+  // Highlight in rules table
+  document.querySelectorAll('#tab-rules .item').forEach(function(el) {
+    el.style.background = '';
+    el.style.outline = '';
+  });
+  var ruleItems = document.querySelectorAll('#tab-rules .item');
+  ruleItems.forEach(function(el) {
+    if (el.textContent.indexOf(ruleName) !== -1) {
+      el.style.background = 'var(--accent)';
+      el.style.outline = '2px solid var(--accent)';
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  });
+}
+
+function _renderShadowedSection(shadowed) {
+  var html = '';
+  if (shadowed.length === 0) {
+    html += '<div style="color:#10b981;font-size:12px;margin:6px 0;">✓ Нет перекрытых правил</div>';
+    return html;
+  }
+  html += '<div style="font-weight:600;color:#f59e0b;margin:8px 0 4px;">🔽 Перекрытые правила (' + shadowed.length + ')</div>';
+  for (var i = 0; i < shadowed.length; i++) {
+    var s = shadowed[i];
+    html += '<div class="quality-card shadowed clickable" onclick="_qHighlightRule(\'' + escapeHtml(s.shadowed_name || '') + '\')">';
+    html += '<span class="ql-badge shadowed">SHADOWED</span>';
+    html += '<b>' + escapeHtml(s.shadowed_name || '?') + '</b>';
+    html += '<div style="color:var(--text2);font-size:11px;">Перекрыто: ' + escapeHtml(s.shadower_name || '?') + '</div>';
+    html += '<div style="color:var(--text2);font-size:10px;">' + escapeHtml(s.reason || '') + '</div>';
+    html += '</div>';
+  }
+  return html;
+}
+
+function _renderConflictSection(conflicts) {
+  var html = '';
+  if (conflicts.length === 0) {
+    html += '<div style="color:#10b981;font-size:12px;margin:6px 0;">✓ Нет конфликтов</div>';
+    return html;
+  }
+  html += '<div style="font-weight:600;color:#e94560;margin:8px 0 4px;">⚡ Конфликты (' + conflicts.length + ')</div>';
+  for (var i = 0; i < conflicts.length; i++) {
+    var c = conflicts[i];
+    html += '<div class="quality-card conflict clickable" onclick="_qHighlightRule(\'' + escapeHtml(c.rule_a || '') + '\')">';
+    html += '<span class="ql-badge conflict">CONFLICT</span>';
+    html += '<b>' + escapeHtml(c.rule_a || '?') + '</b> (' + escapeHtml(c.rule_a_action || '?') + ') ↔ ';
+    html += '<b>' + escapeHtml(c.rule_b || '?') + '</b> (' + escapeHtml(c.rule_b_action || '?') + ')';
+    html += '<div style="color:var(--text2);font-size:10px;">' + escapeHtml(c.scope_description || '') + '</div>';
+    html += '</div>';
+  }
+  return html;
+}
+
+function _renderRedundantSection(redundant) {
+  var html = '';
+  if (redundant.length === 0) {
+    html += '<div style="color:#10b981;font-size:12px;margin:6px 0;">✓ Нет избыточных правил</div>';
+    return html;
+  }
+  html += '<div style="font-weight:600;color:#3b82f6;margin:8px 0 4px;">🔄 Избыточные правила (' + redundant.length + ')</div>';
+  for (var i = 0; i < redundant.length; i++) {
+    var r = redundant[i];
+    html += '<div class="quality-card redundant">';
+    html += '<span class="ql-badge redundant">' + (r.count || '?') + 'x REDUNDANT</span>';
+    html += escapeHtml((r.rules || []).join(', '));
+    html += '</div>';
+  }
+  return html;
+}
+
+function _renderUnusedSection(unused) {
+  var html = '';
+  if (unused.length === 0) {
+    html += '<div style="color:#10b981;font-size:12px;margin:6px 0;">✓ Все правила используются</div>';
+    return html;
+  }
+  html += '<div style="font-weight:600;color:#6b7280;margin:8px 0 4px;">📭 Неиспользуемые/неизвестные правила (' + unused.length + ')</div>';
+  for (var i = 0; i < unused.length; i++) {
+    var u = unused[i];
+    var uStatus = u.status === 'unused' ? 'UNUSED' : u.status === 'low_hits' ? 'LOW HITS' : 'UNKNOWN';
+    var uBadgeClass = u.status === 'unused' ? 'unused' : u.status === 'low_hits' ? 'unused' : 'unused';
+    html += '<div class="quality-card unused clickable" onclick="_qHighlightRule(\'' + escapeHtml(u.rule_name || '') + '\')">';
+    html += '<span class="ql-badge ' + uBadgeClass + '">' + uStatus + '</span>';
+    html += escapeHtml(u.rule_name || '?');
+    html += '</div>';
+  }
+  return html;
 }
 
 function renderMatrix() {
@@ -2410,6 +2608,33 @@ function renderDashboard(data) {
 
   var html = '';
 
+  // ── Color helper ──
+  function kpiColor(name, value) {
+    if (name === 'security_score' || name === 'compliance') {
+      return value >= 80 ? '#10b981' : value >= 50 ? '#f59e0b' : '#e94560';
+    }
+    if (name === 'rules_health') {
+      return value >= 90 ? '#10b981' : value >= 70 ? '#f59e0b' : '#e94560';
+    }
+    if (name === 'open_risks') {
+      return value === 0 ? '#10b981' : value <= 3 ? '#f59e0b' : '#e94560';
+    }
+    if (name === 'attack_surface') {
+      return value === 0 ? '#10b981' : value <= 5 ? '#f59e0b' : '#e94560';
+    }
+    return 'var(--accent)';
+  }
+
+  // ── KPI tab navigation map ──
+  var kpiTabMap = {
+    security_score: 'tab-dashboard',
+    rules_health: 'tab-quality',
+    open_risks: 'tab-audit',
+    compliance: 'tab-audit',
+    zone_count: 'tab-matrix',
+    attack_surface: 'tab-dashboard'
+  };
+
   // KPI Cards
   html += '<div class="kpi-grid">';
   data.kpis.forEach(function(k) {
@@ -2417,26 +2642,56 @@ function renderDashboard(data) {
     if (k.trend !== null && k.trend !== undefined) {
       trendClass = k.trend > 0 ? 'up' : k.trend < 0 ? 'down' : 'flat';
     }
-    html += '<div class="kpi-card">';
+    var color = kpiColor(k.name, k.value);
+    var displayValue = k.value;
+    // Use trend_display for attack_surface since its raw value is meaningless
+    if (k.name === 'attack_surface' && k.trend_display && k.trend_display !== '—') {
+      displayValue = k.trend_display;
+    }
+    if (k.name === 'compliance' || k.name === 'rules_health') {
+      displayValue = k.value + '%';
+    }
+    var targetTab = kpiTabMap[k.name] || '';
+    html += '<div class="kpi-card' + (targetTab ? ' clickable' : '') + '"';
+    if (targetTab) html += ' onclick="switchTab(\'' + targetTab + '\')"';
+    html += '>';
     html += '<div class="kpi-icon">' + (k.icon || '📊') + '</div>';
-    html += '<div class="kpi-value">' + k.value + (k.name === 'compliance' || k.name === 'rules_health' ? '%' : '') + '</div>';
+    html += '<div class="kpi-value" style="color:' + color + ';">' + displayValue + '</div>';
     html += '<div class="kpi-label">' + escapeHtml(k.label) + '</div>';
-    if (k.trend_display) {
+    if (k.trend_display && k.name !== 'attack_surface') {
       html += '<div class="kpi-trend ' + trendClass + '">' + escapeHtml(k.trend_display) + '</div>';
     }
     html += '</div>';
   });
   html += '</div>';
 
-  // Score breakdown chart
-  if (data.security_score_breakdown) {
-    html += '<div class="chart-container"><h4>🛡️ Security Score Breakdown</h4><canvas id="chartScoreBreakdown"></canvas></div>';
-  }
+  // ── Quick Actions row ──
+  html += '<div class="dash-actions">';
+  html += '<button class="dash-action-btn" onclick="switchTab(\'tab-audit\')">🔍 Аудит проблем</button>';
+  html += '<button class="dash-action-btn" onclick="switchTab(\'tab-quality\')">⚙️ Качество правил</button>';
+  html += '<button class="dash-action-btn" onclick="switchTab(\'tab-optimizer\')">🔧 Оптимизировать</button>';
+  html += '<button class="dash-action-btn" onclick="switchTab(\'tab-matrix\')">🔲 Матрица зон</button>';
+  html += '</div>';
 
-  // Rules health chart
-  if (data.rules_health_breakdown) {
-    html += '<div class="chart-container"><h4>📋 Rules Health</h4><canvas id="chartRulesHealth"></canvas></div>';
+  // ── Charts row 1: Score breakdown + Allow/Deny pie ──
+  html += '<div class="chart-row">';
+  if (data.security_score_breakdown) {
+    html += '<div class="chart-container chart-half"><h4>🛡️ Security Score Breakdown</h4><canvas id="chartScoreBreakdown"></canvas></div>';
   }
+  if (data.allow_deny_breakdown) {
+    html += '<div class="chart-container chart-half"><h4>🚦 Allow / Deny</h4><canvas id="chartAllowDeny"></canvas></div>';
+  }
+  html += '</div>';
+
+  // ── Charts row 2: Rules Health + Severity bar ──
+  html += '<div class="chart-row">';
+  if (data.rules_health_breakdown) {
+    html += '<div class="chart-container chart-half"><h4>📋 Rules Health</h4><canvas id="chartRulesHealth"></canvas></div>';
+  }
+  if (data.severity_counts) {
+    html += '<div class="chart-container chart-half"><h4>🎯 Findings by Severity</h4><canvas id="chartSeverity"></canvas></div>';
+  }
+  html += '</div>';
 
   // Trend chart
   if (data.trend_data && data.trend_data.length > 1) {
@@ -2445,12 +2700,13 @@ function renderDashboard(data) {
 
   // Top Risks
   if (data.top_risks && data.top_risks.length) {
+    var sevNames = { critical: '🔴 Крит.', high: '🟠 Выс.', medium: '🟡 Ср.', low: '🟢 Низ.' };
     html += '<div class="top-list"><h4 style="font-size:13px;color:var(--text2);margin-bottom:6px;">⚠️ Top-10 Рисков</h4>';
     data.top_risks.forEach(function(r, i) {
       var sevColors = { critical: '#e94560', high: '#f59e0b', medium: '#3b82f6', low: '#10b981' };
-      html += '<div class="top-item">';
+      html += '<div class="top-item" onclick="switchTab(\'tab-audit\')" style="cursor:pointer;">';
       html += '<span class="rank">#' + (i + 1) + '</span>';
-      html += '<span class="detail"><b>' + escapeHtml(r.risk_type) + '</b> <span style="color:' + (sevColors[r.severity] || '#666') + ';">' + escapeHtml(r.severity) + '</span></span>';
+      html += '<span class="detail"><b>' + escapeHtml(r.risk_type) + '</b> <span style="color:' + (sevColors[r.severity] || '#666') + ';">' + (sevNames[r.severity] || r.severity) + '</span></span>';
       html += '<span class="meta">' + r.count + ' шт.</span>';
       html += '</div>';
     });
@@ -2495,6 +2751,18 @@ function drawDashboardCharts(data) {
     });
   }
 
+  // Allow/Deny — pie
+  var ad = document.getElementById('chartAllowDeny');
+  if (ad && data.allow_deny_breakdown) {
+    var adLabels = Object.keys(data.allow_deny_breakdown);
+    var adValues = Object.values(data.allow_deny_breakdown);
+    dashboardCharts.allowDeny = new Chart(ad, {
+      type: 'pie',
+      data: { labels: adLabels, datasets: [{ data: adValues, backgroundColor: ['#10b981','#e94560','#6b7280'] }] },
+      options: { responsive: true, maintainAspectRatio: true, plugins: { legend: { position: 'bottom', labels: { font: { size: 10 }, color: '#a0a0a0' } } } }
+    });
+  }
+
   // Rules Health — bar
   var rh = document.getElementById('chartRulesHealth');
   if (rh && data.rules_health_breakdown) {
@@ -2504,6 +2772,18 @@ function drawDashboardCharts(data) {
       type: 'bar',
       data: { labels: labels2, datasets: [{ data: values2, backgroundColor: ['#f59e0b','#e94560','#3b82f6','#6b7280','#10b981'] }] },
       options: { responsive: true, maintainAspectRatio: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
+    });
+  }
+
+  // Severity counts — bar
+  var sev = document.getElementById('chartSeverity');
+  if (sev && data.severity_counts) {
+    var sevLabels = Object.keys(data.severity_counts);
+    var sevValues = Object.values(data.severity_counts);
+    dashboardCharts.severity = new Chart(sev, {
+      type: 'bar',
+      data: { labels: sevLabels, datasets: [{ data: sevValues, backgroundColor: ['#e94560','#f59e0b','#3b82f6','#10b981'] }] },
+      options: { responsive: true, maintainAspectRatio: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } } }
     });
   }
 
@@ -2612,17 +2892,31 @@ function renderTopologySummary(mode, data) {
   switch (mode) {
     case 'data-flow':
       html = '<div class="item"><div class="value">📊 Data Flow Topology</div>';
+      html += '<div class="label" style="margin-top:4px;">Всего рёбер: <b>' + (data.total_edges || 0) + '</b></div>';
+
+      // ── Flow type legend ──
+      html += '<div style="margin-top:8px;"><b>Flow Types</b></div>';
       html += '<div class="topo-summary">';
+      var fc = { DB: '#3b82f6', Web: '#10b981', File: '#f59e0b', Mail: '#8b5cf6', Auth: '#e94560', Admin: '#6b7280', Other: '#999' };
+      var flowIcons = { DB: '🗄️', Web: '🌐', File: '📁', Mail: '📧', Auth: '🔑', Admin: '🖥️', Other: '❓' };
       if (data.flow_summary) {
         Object.keys(data.flow_summary).forEach(function(ft) {
-          var fc = { DB: '#3b82f6', Web: '#10b981', File: '#f59e0b', Mail: '#8b5cf6', Auth: '#e94560', Admin: '#6b7280', Other: '#999' };
-          html += '<span class="ts-chip" style="background:' + (fc[ft] || '#333') + ';color:#fff;">' + escapeHtml(ft) + ': ' + data.flow_summary[ft] + '</span>';
+          html += '<span class="ts-chip" style="background:' + (fc[ft] || '#333') + ';color:#fff;">' + (flowIcons[ft] || '') + ' ' + escapeHtml(ft) + ': ' + data.flow_summary[ft] + '</span>';
         });
       }
       html += '</div>';
-      html += '<div class="label">🌐 Presentation: ' + (data.layer_stats ? data.layer_stats.presentation || 0 : 0) + '</div>';
-      html += '<div class="label">⚙️ Application: ' + (data.layer_stats ? data.layer_stats.application || 0 : 0) + '</div>';
-      html += '<div class="label">🗄️ Data: ' + (data.layer_stats ? data.layer_stats.data || 0 : 0) + '</div>';
+
+      // ── Layer legend ──
+      html += '<div style="margin-top:8px;"><b>Data Layers</b></div>';
+      html += '<div class="topo-summary">';
+      var lc = { presentation: '#3b82f6', application: '#f59e0b', data: '#10b981' };
+      var li = { presentation: '🌐', application: '🖥️', data: '🗄️' };
+      if (data.layer_stats) {
+        Object.keys(data.layer_stats).forEach(function(layer) {
+          html += '<span class="ts-chip" style="background:' + (lc[layer] || '#333') + ';color:#fff;">' + (li[layer] || '') + ' ' + escapeHtml(layer) + ': ' + data.layer_stats[layer] + '</span>';
+        });
+      }
+      html += '</div>';
       html += '</div>';
       break;
     case 'trust-boundary':
@@ -2803,6 +3097,9 @@ function renderOptimizer() {
     // Export button
     html += '<button class="opt-export-btn" onclick="exportOptimizationResult()">📄 Экспорт результата</button>';
 
+    // Cache result for export
+    _lastOptimizationResult = data;
+
     container.innerHTML = html;
   })
   .catch(function(e) {
@@ -2811,6 +3108,81 @@ function renderOptimizer() {
 }
 
 var _lastOptimizationResult = null;
+
+// ─── A2b WHAT-IF UI ─────────────────────────────────
+function renderWhatIf() {
+  var resultDiv = document.getElementById('whatif-result');
+  resultDiv.innerHTML = '<div style="text-align:center;padding:10px;color:var(--text2);">⏳ Симуляция...</div>';
+
+  var changeType = document.getElementById('whatif-type').value;
+  var ruleName = document.getElementById('whatif-rule-name').value;
+  var newValue = document.getElementById('whatif-new-value').value;
+
+  fetch('/api/what-if', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      rules: [],
+      change_type: changeType,
+      rule_name: ruleName,
+      new_value: newValue,
+      old_value: '',
+      description: 'What-If simulation from UI'
+    })
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(data) {
+    var riskClass = data.risk_delta > 0 ? '#e94560' : data.risk_delta < 0 ? '#10b981' : 'var(--text2)';
+    var riskArrow = data.risk_delta > 0 ? '↑' : data.risk_delta < 0 ? '↓' : '→';
+
+    var html = '<div class="impact-card">';
+    html += '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:8px;">';
+    html += '<div style="flex:1;min-width:80px;"><span class="label">Исходный риск</span><div style="font-size:18px;font-weight:700;">' + (data.original_risk||0).toFixed(1) + '</div></div>';
+    html += '<div style="flex:1;min-width:80px;"><span class="label">Новый риск</span><div style="font-size:18px;font-weight:700;">' + (data.new_risk||0).toFixed(1) + '</div></div>';
+    html += '<div style="flex:1;min-width:80px;"><span class="label">Δ Риск</span><div style="font-size:18px;font-weight:700;color:' + riskClass + ';">' + riskArrow + ' ' + Math.abs(data.risk_delta||0).toFixed(1) + '</div></div>';
+    html += '<div style="flex:1;min-width:80px;"><span class="label">Impact Score</span><div style="font-size:18px;font-weight:700;">' + (data.impact||0).toFixed(1) + '/10</div></div>';
+    html += '</div></div>';
+
+    // New issues
+    var issues = data.new_issues || [];
+    if (issues.length > 0) {
+      html += '<div class="impact-card"><h4 style="font-size:12px;color:#e94560;margin-bottom:4px;">⚠️ Новые проблемы (' + issues.length + ')</h4>';
+      issues.forEach(function(i) {
+        html += '<div style="font-size:11px;padding:2px 0;">' + escapeHtml(i) + '</div>';
+      });
+      html += '</div>';
+    }
+
+    // Resolved issues
+    var resolved = data.resolved_issues || [];
+    if (resolved.length > 0) {
+      html += '<div class="impact-card"><h4 style="font-size:12px;color:#10b981;margin-bottom:4px;">✅ Исправлено (' + resolved.length + ')</h4>';
+      resolved.forEach(function(i) {
+        html += '<div style="font-size:11px;padding:2px 0;">' + escapeHtml(i) + '</div>';
+      });
+      html += '</div>';
+    }
+
+    // Recommendations
+    var recs = data.recommendations || [];
+    if (recs.length > 0) {
+      html += '<div class="impact-card"><h4 style="font-size:12px;color:var(--accent);margin-bottom:4px;">💡 Рекомендации</h4>';
+      recs.forEach(function(r) {
+        html += '<div style="font-size:11px;padding:2px 0;">' + escapeHtml(r) + '</div>';
+      });
+      html += '</div>';
+    }
+
+    if (!issues.length && !resolved.length && !recs.length) {
+      html += '<div class="item" style="text-align:center;"><div class="label" style="color:#10b981;">✓ Изменение не создало проблем</div></div>';
+    }
+
+    resultDiv.innerHTML = html;
+  })
+  .catch(function(e) {
+    resultDiv.innerHTML = '<div class="item"><div class="label" style="color:#e94560;">Ошибка симуляции: ' + e + '</div></div>';
+  });
+}
 
 function exportOptimizationResult() {
   if (!_lastOptimizationResult) {

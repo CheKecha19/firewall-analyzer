@@ -724,6 +724,50 @@ async def impact_report(type: str = "node", id: str = ""):
     })
 
 
+# ─── What-If Analysis ──────────────────────────────────
+
+@app.post("/api/what-if")
+async def what_if_analyze(request: dict = None):
+    """Симуляция изменения правил."""
+    from src.core.what_if import WhatIfAnalyzer, RuleChange, ChangeType
+
+    if not request:
+        return JSONResponse({"error": "Missing request body"}, status_code=400)
+
+    change_type_str = request.get("change_type", "add")
+    change_map = {
+        "add": ChangeType.ADD_RULE,
+        "remove": ChangeType.REMOVE_RULE,
+        "change_action": ChangeType.CHANGE_ACTION,
+        "change_source": ChangeType.CHANGE_SOURCE,
+        "change_dest": ChangeType.CHANGE_DEST,
+        "change_service": ChangeType.CHANGE_SERVICE,
+    }
+
+    change = RuleChange(
+        change_type=change_map.get(change_type_str, ChangeType.ADD_RULE),
+        rule_id=request.get("rule_id"),
+        rule_name=request.get("rule_name"),
+        old_value=request.get("old_value"),
+        new_value=request.get("new_value"),
+        description=request.get("description", ""),
+        risk_delta=0.0,
+    )
+
+    analyzer = WhatIfAnalyzer([])
+    result = analyzer.simulate([change])
+
+    return JSONResponse({
+        "original_risk": result.original_risk,
+        "new_risk": result.new_risk,
+        "risk_delta": result.risk_delta,
+        "impact": result.impact_score,
+        "new_issues": result.new_issues,
+        "resolved_issues": result.resolved_issues,
+        "recommendations": result.recommendations,
+    })
+
+
 # ─── Главная страница (читает HTML из отдельного файла) ──────
 
 @app.get("/", response_class=HTMLResponse)
