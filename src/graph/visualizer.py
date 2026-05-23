@@ -601,6 +601,77 @@ class GraphVisualizer:
             print(f"[WARN] MITRE mapping failed: {e}")
             mitre_json = '[]'
 
+        # ── Zone matrix data (for static mode) ──
+        try:
+            zone_matrix_data = self._generate_zone_matrix_data()
+            zone_matrix_json = json.dumps(zone_matrix_data, ensure_ascii=False)
+        except Exception as e:
+            print(f"[WARN] Zone matrix generation failed: {e}")
+            zone_matrix_json = '{}'
+
+        # ── Sankey data (for static mode) ──
+        try:
+            sankey_data = self._generate_sankey_data()
+            sankey_json = json.dumps(sankey_data, ensure_ascii=False)
+        except Exception as e:
+            print(f"[WARN] Sankey generation failed: {e}")
+            sankey_json = '{}'
+
+        # ── Hilbert data (for static mode) ──
+        try:
+            hilbert_data = self._generate_hilbert_data()
+            hilbert_json = json.dumps(hilbert_data, ensure_ascii=False)
+        except Exception as e:
+            print(f"[WARN] Hilbert generation failed: {e}")
+            hilbert_json = '{}'
+
+        # ── Rule quality data (for static mode) ──
+        try:
+            from src.core.rule_quality import RuleQualityAnalyzer
+            qa = RuleQualityAnalyzer(self.rules, self.graph)
+            quality_data = qa.analyze()
+            quality_json = json.dumps(quality_data, ensure_ascii=False, default=str)
+        except Exception as e:
+            print(f"[WARN] Rule quality generation failed: {e}")
+            quality_json = '{}'
+
+        # ── Rule optimizer preview (for static mode) ──
+        try:
+            from src.core.rule_optimizer import RuleOptimizer
+            opt = RuleOptimizer(self.rules)
+            opt_result = opt.preview()
+            optimizer_json = json.dumps(opt_result, ensure_ascii=False, default=str)
+        except Exception as e:
+            print(f"[WARN] Optimizer generation failed: {e}")
+            optimizer_json = '{}'
+
+        # ── Static mode topology data (7 topology modes) ──
+        topo_json = {}
+        topo_modes = {
+            'data-flow': ('src.core.data_flow_topology', 'analyze_data_flow'),
+            'trust-boundary': ('src.core.trust_boundary_topology', 'analyze_trust_boundary'),
+            'resilience': ('src.core.resilience_topology', 'analyze_resilience'),
+            'encryption': ('src.core.encryption_topology', 'analyze_encryption'),
+            'lateral-movement': ('src.core.lateral_movement_topology', 'analyze_lateral_movement'),
+            'microseg': ('src.core.microseg_topology', 'analyze_microseg'),
+            'vrf': ('src.core.vrf_topology', 'analyze_vrf'),
+        }
+        for mode, (module_name, func_name) in topo_modes.items():
+            try:
+                import importlib
+                mod = importlib.import_module(module_name)
+                func = getattr(mod, func_name)
+                kwargs = {'nodes': nodes_data, 'edges': edges_data}
+                if mode == 'vrf':
+                    kwargs['rules'] = rules_table
+                result = func(**kwargs)
+                import dataclasses
+                result_dict = dataclasses.asdict(result) if dataclasses.is_dataclass(result) else result.__dict__
+                topo_json[mode] = json.dumps(result_dict, ensure_ascii=False)
+            except Exception as e:
+                print(f"[WARN] Topology {mode} generation failed: {e}")
+                topo_json[mode] = '{}'
+
         # STATIC_MODE flag
         static_mode = 'true'
 
@@ -626,6 +697,18 @@ class GraphVisualizer:
         html = html.replace('__RISK_SEVERITY_JSON__', risk_severity_json)
         html = html.replace('__SERVICES_JSON__', service_json)
         html = html.replace('__MITRE_JSON__', mitre_json)
+        html = html.replace('__TOPO_DATA_FLOW_JSON__', topo_json.get('data-flow', '{}'))
+        html = html.replace('__TOPO_TRUST_BOUNDARY_JSON__', topo_json.get('trust-boundary', '{}'))
+        html = html.replace('__TOPO_RESILIENCE_JSON__', topo_json.get('resilience', '{}'))
+        html = html.replace('__TOPO_ENCRYPTION_JSON__', topo_json.get('encryption', '{}'))
+        html = html.replace('__TOPO_LATERAL_MOVEMENT_JSON__', topo_json.get('lateral-movement', '{}'))
+        html = html.replace('__TOPO_MICROSEG_JSON__', topo_json.get('microseg', '{}'))
+        html = html.replace('__TOPO_VRF_JSON__', topo_json.get('vrf', '{}'))
+        html = html.replace('__ZONE_MATRIX_JSON__', zone_matrix_json)
+        html = html.replace('__SANKEY_JSON__', sankey_json)
+        html = html.replace('__HILBERT_JSON__', hilbert_json)
+        html = html.replace('__QUALITY_JSON__', quality_json)
+        html = html.replace('__OPTIMIZER_JSON__', optimizer_json)
         html = html.replace('__STATIC_MODE__', static_mode)
 
         # ── Write output ──

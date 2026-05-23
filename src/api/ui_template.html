@@ -97,6 +97,16 @@ header {
 }
 #theme-btn:hover { background: var(--hover-bg); }
 
+/* Navigation buttons (Dashboard / Map) */
+.nav-btn {
+  background: var(--bg3); border: 1px solid var(--border); color: var(--text);
+  padding: 4px 12px; height: 32px; border-radius: 6px; cursor: pointer;
+  font-size: 13px; transition: background 0.2s, border-color 0.2s;
+  white-space: nowrap;
+}
+.nav-btn:hover { background: var(--hover-bg); border-color: var(--accent); }
+.nav-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+
 .toolbar {
   background: var(--bg2);
   border-bottom: 1px solid var(--border);
@@ -145,7 +155,7 @@ header {
 #minimap {
   position: absolute;
   bottom: 10px;
-  right: 320px;
+  left: 320px;
   width: 200px;
   height: 140px;
   border: 1px solid var(--border);
@@ -158,7 +168,7 @@ header {
 .sidebar {
   width: 310px;
   background: var(--panel-bg);
-  border-left: 1px solid var(--border);
+  border-right: 1px solid var(--border);
   display: flex;
   flex-direction: column;
   backdrop-filter: blur(8px);
@@ -234,8 +244,8 @@ header {
 path-panel {
   position: absolute;
   bottom: 0;
-  left: 0;
-  right: 310px;
+  left: 310px;
+  right: 0;
   background: var(--panel-bg);
   border-top: 1px solid var(--border);
   padding: 8px 12px;
@@ -269,8 +279,8 @@ path-panel .hop.accepted { background: #27ae60; color: #fff; border-color: #1e84
 #drill-bread {
   position: absolute;
   top: 0;
-  left: 0;
-  right: 310px;
+  left: 310px;
+  right: 0;
   background: var(--panel-bg);
   border-bottom: 1px solid var(--border);
   padding: 6px 12px;
@@ -327,6 +337,44 @@ path-panel .hop.accepted { background: #27ae60; color: #fff; border-color: #1e84
   display: inline-block; padding: 2px 6px; border-radius: 3px;
   font-size: 10px; font-weight: 600; margin-left: 6px;
 }
+
+/* ── Full-screen Dashboard ── */
+#full-dashboard {
+  display: none;
+  width: 100%;
+  height: 100%;
+  overflow-y: auto;
+  padding: 20px 32px;
+  background: var(--bg);
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 8;
+}
+#full-dashboard.visible {
+  display: block;
+}
+#full-dashboard .kpi-grid {
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+}
+#full-dashboard .chart-container {
+  max-width: 100%;
+}
+#full-dashboard .chart-container canvas {
+  max-height: 280px;
+}
+#full-dashboard .chart-row {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+#full-dashboard .chart-half {
+  flex: 1;
+  min-width: 380px;
+}
+
+#full-dashboard-content { min-height: 100%; }
 
 /* Quality Cards */
 .quality-header {
@@ -671,6 +719,8 @@ path-panel .hop.accepted { background: #27ae60; color: #fff; border-color: #1e84
     <span>Issues: <b id="stat-issues">0</b></span>
   </div>
   <div class="header-right">
+    <button id="btn-dashboard" class="nav-btn active" onclick="showDashboard()">📊 Дашборд</button>
+    <button id="btn-map" class="nav-btn" onclick="showMap()">🗺️ Карта</button>
     <button id="theme-btn" onclick="toggleTheme()">🌙</button>
   </div>
 </header>
@@ -713,13 +763,6 @@ path-panel .hop.accepted { background: #27ae60; color: #fff; border-color: #1e84
 </div>
 
 <div id="container">
-  <div id="mynetwork">
-    <canvas id="network-canvas"></canvas>
-    <div id="minimap"><canvas id="minimap-canvas" width="200" height="140"></canvas></div>
-    <div id="graph3d"></div>
-    <div id="loading">Loading...</div>
-    <div id="context-menu"></div>
-  </div>
   <div class="sidebar" id="sidebar">
     <div class="tab-nav">
       <button class="active" data-tab="tab-dashboard">📈 Дашборд</button>
@@ -817,6 +860,31 @@ path-panel .hop.accepted { background: #27ae60; color: #fff; border-color: #1e84
       </div>
     </div>
   </div>
+  <div id="full-dashboard">
+    <div id="full-dashboard-content" style="color:var(--text2);font-size:14px;text-align:center;padding:40px;">
+      Загрузка дашборда...
+    </div>
+    <div id="full-dashboard-extras" style="margin-top:16px;max-width:1200px;">
+      <div class="chart-row">
+        <div class="chart-container chart-half" id="full-risk-donut-container">
+          <h4>🎯 Risk Severity</h4>
+          <canvas id="full-risk-donut"></canvas>
+          <div class="donut-legend" id="full-donut-legend"></div>
+        </div>
+        <div class="chart-container chart-half" id="full-service-table-container">
+          <h4>📡 Top Services</h4>
+          <div id="full-service-table">Загрузка...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div id="mynetwork">
+    <canvas id="network-canvas"></canvas>
+    <div id="minimap"><canvas id="minimap-canvas" width="200" height="140"></canvas></div>
+    <div id="graph3d"></div>
+    <div id="loading">Loading...</div>
+    <div id="context-menu"></div>
+  </div>
   <div id="drill-bread">
     <span class="bread-label">📌 Зона:</span>
     <span class="bread-zone" id="drill-zone-name"></span>
@@ -839,6 +907,18 @@ var __dashboardData = __DASHBOARD_JSON__;
 var __riskSeverityData = __RISK_SEVERITY_JSON__;
 var __servicesData = __SERVICES_JSON__;
 var __mitreData = __MITRE_JSON__;
+var __topoDataFlow = __TOPO_DATA_FLOW_JSON__;
+var __topoTrustBoundary = __TOPO_TRUST_BOUNDARY_JSON__;
+var __topoResilience = __TOPO_RESILIENCE_JSON__;
+var __topoEncryption = __TOPO_ENCRYPTION_JSON__;
+var __topoLateralMovement = __TOPO_LATERAL_MOVEMENT_JSON__;
+var __topoMicroseg = __TOPO_MICROSEG_JSON__;
+var __topoVrf = __TOPO_VRF_JSON__;
+var __zoneMatrixData = __ZONE_MATRIX_JSON__;
+var __sankeyData = __SANKEY_JSON__;
+var __hilbertData = __HILBERT_JSON__;
+var __qualityData = __QUALITY_JSON__;
+var __optimizerData = __OPTIMIZER_JSON__;
 
 // ─── STATE ───────────────────────────────────────────
 var currentMode = 'standard';
@@ -853,6 +933,8 @@ var prevGraphState = null; // Saved state for drill-down back button
 
 // ─── INIT ────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', function() {
+  // Set Map button as active by default
+  document.getElementById('btn-map').classList.add('active');
   applyBranding();
   applyTheme();
   updateStats();
@@ -925,6 +1007,48 @@ function toggleTheme() {
   localStorage.setItem('theme', next);
 }
 
+// ─── DASHBOARD / MAP VIEW TOGGLE ─────────────────────
+function showDashboard() {
+  document.getElementById('mynetwork').style.display = 'none';
+  document.getElementById('sidebar').style.display = 'none';
+  document.getElementById('drill-bread').style.display = 'none';
+  document.getElementById('full-dashboard').classList.add('visible');
+  document.getElementById('btn-dashboard').classList.add('active');
+  document.getElementById('btn-map').classList.remove('active');
+  // Pause network physics
+  if (network) network.setOptions({ physics: { enabled: false } });
+  // Re-render full dashboard charts (canvases may need resize after display change)
+  if (!STATIC_MODE) {
+    fetch('/api/dashboard')
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        renderDashboard(data, 'full-dashboard-content');
+      });
+  } else {
+    if (__dashboardData && __dashboardData.kpis) {
+      renderDashboard(__dashboardData, 'full-dashboard-content');
+    }
+  }
+}
+
+function showMap() {
+  document.getElementById('full-dashboard').classList.remove('visible');
+  document.getElementById('mynetwork').style.display = '';
+  document.getElementById('sidebar').style.display = '';
+  document.getElementById('drill-bread').style.display = '';
+  document.getElementById('btn-dashboard').classList.remove('active');
+  document.getElementById('btn-map').classList.add('active');
+  // Restore physics and redraw
+  if (network) {
+    network.redraw();
+    network.setOptions({ physics: { enabled: true, stabilization: { iterations: 50 } } });
+    setTimeout(function() {
+      network.setOptions({ physics: { enabled: false } });
+      renderMinimap();
+    }, 800);
+  }
+}
+
 function applyTheme(theme) {
   if (!theme) {
     theme = localStorage.getItem('theme');
@@ -944,7 +1068,10 @@ function updateNetworkColors() {
   var fontColor = isLight ? '#24292f' : '#c9d1d9';
   var edgeColor = isLight ? '#999' : '#666';
   if (network) {
+    // Preserve current physics state — don't reset to vis.js defaults
+    var currentPhysics = network.physics ? network.physics.options : { enabled: false };
     network.setOptions({
+      physics: currentPhysics,
       nodes: { font: { color: fontColor } },
       edges: { color: { color: edgeColor } }
     });
@@ -1042,14 +1169,19 @@ function initNetwork() {
     renderMinimap();
   });
 
+  // ── Unified drag tracking (replaces fragile mouseup/mouseleave hacks) ──
+  var _networkDragActive = false;
+  var _lastDragType = null; // 'node' | 'canvas'
+
   network.on('dragStart', function(params) {
-    if (params.nodes.length > 0) {
-      network.setOptions({ physics: { enabled: false } });
-    }
+    _networkDragActive = true;
+    _lastDragType = params.nodes.length > 0 ? 'node' : 'canvas';
+    network.setOptions({ physics: { enabled: false } });
   });
 
   network.on('dragEnd', function(params) {
-    if (params.nodes.length > 0) {
+    _networkDragActive = false;
+    if (_lastDragType === 'node') {
       network.setOptions({ physics: { enabled: true, stabilization: { iterations: 50 } } });
       setTimeout(function() {
         network.setOptions({ physics: { enabled: false } });
@@ -1059,6 +1191,21 @@ function initNetwork() {
       renderMinimap();
     }
   });
+
+  // Single window-level mouseup: only act when a drag was actually in progress.
+  // This prevents spurious setOptions on every toolbar click / mouseleave.
+  window.addEventListener('mouseup', function(e) {
+    if (!_networkDragActive || !network) return;
+    _networkDragActive = false;
+
+    if (_lastDragType === 'canvas') {
+      // Panning: just freeze physics, redraw minimap
+      network.setOptions({ physics: { enabled: false } });
+      renderMinimap();
+    }
+    // For 'node' drag we let vis.js dragEnd handle the stabilisation sequence.
+  });
+
   network.on('zoom', function() { renderMinimap(); });
 
   setTimeout(function() { document.getElementById('loading').style.display = 'none'; renderMinimap(); }, 3000);
@@ -1907,6 +2054,10 @@ function cmAction(action) {
 
 // ─── SIDEBAR ─────────────────────────────────────────
 function switchTab(tabId) {
+  // If full-dashboard is visible, switch back to map view first
+  if (document.getElementById('full-dashboard').classList.contains('visible')) {
+    showMap();
+  }
   document.querySelectorAll('.tab-nav button').forEach(function(b) { b.classList.remove('active'); });
   var btn = document.querySelector('.tab-nav button[data-tab="' + tabId + '"]');
   if (btn) btn.classList.add('active');
@@ -2186,52 +2337,72 @@ function _renderMitreStatic(container) {
 }
 
 function filterMitreTechnique(techId) {
+  var container = document.getElementById('tab-info');
+
+  // In static mode, filter from preloaded __mitreData
+  if (STATIC_MODE) {
+    var matches = (__mitreData || []).filter(function(m) { return m.technique_id === techId; });
+    if (!matches.length) {
+      container.innerHTML = '<div style="padding:12px"><div class="item"><div class="label">Нет findings для ' + escapeHtml(techId) + '</div></div></div>';
+    } else {
+      _renderMitreTechniqueMatches(techId, matches, container);
+    }
+    switchTab('tab-info');
+    return;
+  }
+
   fetch('/api/mitre?technique=' + encodeURIComponent(techId))
     .then(function(r) { return r.json(); })
     .then(function(data) {
-      var container = document.getElementById('tab-info');
       if (!data.matches || !data.matches.length) {
         container.innerHTML = '<div style="padding:12px"><div class="item"><div class="label">Нет findings для ' + escapeHtml(techId) + '</div></div></div>';
       } else {
-        var techName = data.matches[0].technique_name || techId;
-        var tactic = data.matches[0].tactic || '';
-        var html = '<div style="padding:12px">';
-        html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">';
-        html += '<button onclick="switchTab(\'tab-mitre\')" style="background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:4px 8px;border-radius:4px;cursor:pointer;font-size:11px">← Назад к матрице</button>';
-        html += '<h3 style="margin:0;color:var(--accent)">' + escapeHtml(techId) + ': ' + escapeHtml(techName) + '</h3>';
-        html += '</div>';
-        html += '<div style="font-size:11px;color:var(--text2);margin-bottom:8px">';
-        html += 'Tactic: <b>' + escapeHtml(tactic) + '</b> | ';
-        html += 'Найдено: <b>' + data.total_matches + '</b> finding(s)';
-        html += '</div>';
-        var sevs = { critical: [], high: [], medium: [], low: [], info: [] };
-        for (var i = 0; i < data.matches.length; i++) {
-          var s = data.matches[i].severity || 'low';
-          (sevs[s] = sevs[s] || []).push(data.matches[i]);
-        }
-        var sevOrder = ['critical','high','medium','low','info'];
-        for (var si = 0; si < sevOrder.length; si++) {
-          var sev = sevOrder[si];
-          var items = sevs[sev];
-          if (!items || !items.length) continue;
-          for (var j = 0; j < items.length; j++) {
-            var m = items[j];
-            html += '<div class="issue-card ' + (m.severity || 'low') + '">';
-            html += '<div class="severity">' + escapeHtml(m.severity || '?') + ' | ' + escapeHtml(m.technique_name || techId) + '</div>';
-            html += '<div class="desc">' + escapeHtml(m.finding_type || '?') + '</div>';
-            html += '<div class="rec">Tactic: ' + escapeHtml(m.tactic || '?') + ' | Confidence: ' + escapeHtml(m.confidence || '?') + (m.description ? ' | ' + escapeHtml(m.description) : '') + '</div>';
-            html += '</div>';
-          }
-        }
-        html += '</div>';
-        container.innerHTML = html;
+        _renderMitreTechniqueMatches(techId, data.matches, container);
       }
-      // Switch to info tab
       switchTab('tab-info');
     });
 }
 
+function _renderMitreTechniqueMatches(techId, matches, container) {
+  var techName = matches[0].technique_name || techId;
+  var tactic = matches[0].tactic || '';
+  var html = '<div style="padding:12px">';
+  html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">';
+  html += '<button onclick="switchTab(\'tab-mitre\')" style="background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:4px 8px;border-radius:4px;cursor:pointer;font-size:11px">← Назад к матрице</button>';
+  html += '<h3 style="margin:0;color:var(--accent)">' + escapeHtml(techId) + ': ' + escapeHtml(techName) + '</h3>';
+  html += '</div>';
+  html += '<div style="font-size:11px;color:var(--text2);margin-bottom:8px">';
+  html += 'Tactic: <b>' + escapeHtml(tactic) + '</b> | ';
+  html += 'Найдено: <b>' + matches.length + '</b> finding(s)';
+  html += '</div>';
+  var sevs = { critical: [], high: [], medium: [], low: [], info: [] };
+  for (var i = 0; i < matches.length; i++) {
+    var s = matches[i].severity || 'low';
+    (sevs[s] = sevs[s] || []).push(matches[i]);
+  }
+  var sevOrder = ['critical','high','medium','low','info'];
+  for (var si = 0; si < sevOrder.length; si++) {
+    var sev = sevOrder[si];
+    var items = sevs[sev];
+    if (!items || !items.length) continue;
+    for (var j = 0; j < items.length; j++) {
+      var m = items[j];
+      html += '<div class="issue-card ' + (m.severity || 'low') + '">';
+      html += '<div class="severity">' + escapeHtml(m.severity || '?') + ' | ' + escapeHtml(m.technique_name || techId) + '</div>';
+      html += '<div class="desc">' + escapeHtml(m.finding_type || '?') + '</div>';
+      html += '<div class="rec">Tactic: ' + escapeHtml(m.tactic || '?') + ' | Confidence: ' + escapeHtml(m.confidence || '?') + (m.description ? ' | ' + escapeHtml(m.description) : '') + '</div>';
+      html += '</div>';
+    }
+  }
+  html += '</div>';
+  container.innerHTML = html;
+}
+
 function switchTab(tabId) {
+  // If full-dashboard is visible, switch back to map view first
+  if (document.getElementById('full-dashboard').classList.contains('visible')) {
+    showMap();
+  }
   document.querySelectorAll('.tab-nav button').forEach(function(b) { b.classList.remove('active'); });
   var btn = document.querySelector('[data-tab="' + tabId + '"]');
   if (btn) btn.classList.add('active');
@@ -2251,6 +2422,11 @@ function renderAttackGraph() {
   document.querySelector('[data-tab="tab-info"]').classList.add('active');
   document.querySelectorAll('.tab-content').forEach(function(tc) { tc.classList.remove('active'); });
   document.getElementById('tab-info').classList.add('active');
+
+  if (STATIC_MODE) {
+    container.innerHTML = '<div class="item"><div class="label">Граф атак недоступен в статическом режиме — требуется активный сервер для анализа</div></div>';
+    return;
+  }
 
   fetch('/api/attack-graph')
     .then(function(r) { return r.json(); })
@@ -2362,6 +2538,7 @@ function renderAttackGraph() {
 
 function focusAttackPath(src, dst) {
   if (!network) return;
+  if (STATIC_MODE) return;
   fetch('/api/attack-graph')
     .then(function(r) { return r.json(); })
     .then(function(data) {
@@ -2386,15 +2563,33 @@ function focusAttackPath(src, dst) {
 // ─── QUALITY TAB ─────────────────────────────────────
 function renderQuality() {
   var container = document.getElementById('tab-quality');
+
+  if (STATIC_MODE) {
+    if (__qualityData && (__qualityData.quality_score !== undefined || __qualityData.total_rules !== undefined)) {
+      _renderQualityContent(__qualityData, container);
+    } else {
+      container.innerHTML = '<div class="item"><div class="label">Анализ качества недоступен в статическом режиме</div></div>';
+    }
+    return;
+  }
+
   container.innerHTML = '<div style="text-align:center;padding:10px;color:var(--text2);">Загрузка анализа качества...</div>';
 
   fetch('/api/rules/quality')
     .then(function(r) { return r.json(); })
     .then(function(data) {
-      var score = data.quality_score || 100;
-      var scoreClass = score >= 80 ? 'good' : score >= 50 ? 'warn' : 'bad';
-      var summary = data.summary || {};
-      var shadowed = data.shadowed || [];
+      _renderQualityContent(data, container);
+    })
+    .catch(function() {
+      container.innerHTML = '<div class="item"><div class="label" style="color:#e94560;">Ошибка загрузки анализа качества</div></div>';
+    });
+}
+
+function _renderQualityContent(data, container) {
+  var score = data.quality_score || 100;
+  var scoreClass = score >= 80 ? 'good' : score >= 50 ? 'warn' : 'bad';
+  var summary = data.summary || {};
+  var shadowed = data.shadowed || [];
       var conflicts = data.conflicts || [];
       var redundant = data.redundant || [];
       var unused = data.unused || [];
@@ -2469,11 +2664,7 @@ function renderQuality() {
           });
         });
       }
-    })
-    .catch(function() {
-      container.innerHTML = '<div class="item"><div class="label" style="color:#e94560;">Ошибка загрузки анализа качества</div></div>';
-    });
-}
+} // end _renderQualityContent
 
 // ── Quality helpers ──
 
@@ -2591,87 +2782,101 @@ function _renderUnusedSection(unused) {
 function renderMatrix() {
   var container = document.getElementById('matrix-content');
   if (!container) return;
+
+  if (STATIC_MODE) {
+    if (__zoneMatrixData && __zoneMatrixData.zones && __zoneMatrixData.zones.length > 0) {
+      _renderMatrixContent(__zoneMatrixData, container);
+    } else {
+      container.innerHTML = '<div class="item"><div class="label">Матрица зон недоступна в статическом режиме</div></div>';
+    }
+    return;
+  }
+
   container.innerHTML = '<div style="text-align:center;padding:10px;color:var(--text2);">Загрузка матрицы зон...</div>';
 
   fetch('/api/zone-matrix')
     .then(function(r) { return r.json(); })
     .then(function(data) {
-      if (!data.zones || data.zones.length === 0) {
-        container.innerHTML = '<div class="item"><div class="label">Нет данных о зонах безопасности</div></div>';
-        return;
-      }
-
-      var zones = data.zones;
-      var cells = data.cells;
-      var isDark = document.documentElement.getAttribute('data-theme') !== 'light';
-
-      var bgColor = isDark ? '#16213e' : '#fff';
-      var textColor = isDark ? '#ddd' : '#333';
-      var headerBg = isDark ? '#0f3460' : '#667eea';
-      var headerColor = '#fff';
-      var borderColor = isDark ? '#0f3460' : '#ddd';
-
-      var html = '<table style="border-collapse:collapse;font-size:11px;font-family:Segoe UI,sans-serif;width:100%;">';
-      html += '<thead><tr><th style="background:' + headerBg + ';color:' + headerColor + ';padding:6px 8px;position:sticky;top:0;z-index:2;">Src \\ Dst</th>';
-      for (var i = 0; i < zones.length; i++) {
-        html += '<th style="background:' + headerBg + ';color:' + headerColor + ';padding:6px 8px;position:sticky;top:0;z-index:2;min-width:90px;text-align:center;">' + zones[i] + '</th>';
-      }
-      html += '</tr></thead><tbody>';
-
-      for (var ri = 0; ri < zones.length; ri++) {
-        var srcZone = zones[ri];
-        html += '<tr><th style="background:' + headerBg + ';color:' + headerColor + ';padding:6px 8px;position:sticky;left:0;z-index:1;text-align:right;">' + srcZone + '</th>';
-        for (var ci = 0; ci < zones.length; ci++) {
-          var dstZone = zones[ci];
-          var key = srcZone + '|||' + dstZone;
-          var cell = cells[key];
-          var isDiagonal = (srcZone === dstZone);
-
-          var cellBg = bgColor;
-          var cellText = '';
-
-          if (cell && cell.total > 0) {
-            var avgRisk = cell.avgRisk || 0;
-            if (!isDiagonal) {
-              if (avgRisk >= 7) cellBg = 'rgba(255,68,68,0.25)';
-              else if (avgRisk >= 4) cellBg = 'rgba(255,204,0,0.25)';
-              else cellBg = 'rgba(39,174,96,0.25)';
-            }
-            cellText = '<b>' + cell.total + '</b><br><span style="font-size:9px;">' +
-              '<span style="color:#27ae60;">✓' + cell.accept + '</span> ' +
-              '<span style="color:#e74c3c;">✗' + cell.deny + '</span></span>';
-          }
-
-          if (isDiagonal) {
-            cellBg = isDark ? '#1a1a2e' : '#f0f0f0';
-            cellText = '<span style="color:#999;font-size:10px;">intra-zone</span>';
-          }
-
-          var tooltip = 'Из ' + srcZone + ' в ' + dstZone;
-          if (cell && cell.total > 0) {
-            tooltip += '\nВсего: ' + cell.total + ' | Accept: ' + cell.accept + ' | Deny: ' + cell.deny + ' | Avg Risk: ' + (cell.avgRisk || 0);
-            if (cell.ruleNames && cell.ruleNames.length > 0) {
-              tooltip += '\nПравила: ' + cell.ruleNames.join(', ');
-            }
-          }
-
-          html += '<td style="border:1px solid ' + borderColor + ';padding:6px;text-align:center;' +
-            'cursor:pointer;background:' + cellBg + ';color:' + textColor + ';' +
-            'min-width:90px;transition:background 0.15s;' +
-            'font-family:Segoe UI,sans-serif;' +
-            '" onmouseover="this.style.filter=\'brightness(1.2)\';" onmouseout="this.style.filter=\'\';"' +
-            ' title="' + tooltip + '"' +
-            ' onclick="alert(\'' + tooltip.replace(/\\n/g, '\\n') + '\')">' +
-            cellText + '</td>';
-        }
-        html += '</tr>';
-      }
-      html += '</tbody></table>';
-      container.innerHTML = html;
+      _renderMatrixContent(data, container);
     })
     .catch(function() {
       container.innerHTML = '<div class="item"><div class="label" style="color:#e94560;">Ошибка загрузки матрицы зон</div></div>';
     });
+}
+
+function _renderMatrixContent(data, container) {
+  if (!data.zones || data.zones.length === 0) {
+    container.innerHTML = '<div class="item"><div class="label">Нет данных о зонах безопасности</div></div>';
+    return;
+  }
+
+  var zones = data.zones;
+  var cells = data.cells;
+  var isDark = document.documentElement.getAttribute('data-theme') !== 'light';
+
+  var bgColor = isDark ? '#16213e' : '#fff';
+  var textColor = isDark ? '#ddd' : '#333';
+  var headerBg = isDark ? '#0f3460' : '#667eea';
+  var headerColor = '#fff';
+  var borderColor = isDark ? '#0f3460' : '#ddd';
+
+  var html = '<table style="border-collapse:collapse;font-size:11px;font-family:Segoe UI,sans-serif;width:100%;">';
+  html += '<thead><tr><th style="background:' + headerBg + ';color:' + headerColor + ';padding:6px 8px;position:sticky;top:0;z-index:2;">Src \\ Dst</th>';
+  for (var i = 0; i < zones.length; i++) {
+    html += '<th style="background:' + headerBg + ';color:' + headerColor + ';padding:6px 8px;position:sticky;top:0;z-index:2;min-width:90px;text-align:center;">' + zones[i] + '</th>';
+  }
+  html += '</tr></thead><tbody>';
+
+  for (var ri = 0; ri < zones.length; ri++) {
+    var srcZone = zones[ri];
+    html += '<tr><th style="background:' + headerBg + ';color:' + headerColor + ';padding:6px 8px;position:sticky;left:0;z-index:1;text-align:right;">' + srcZone + '</th>';
+    for (var ci = 0; ci < zones.length; ci++) {
+      var dstZone = zones[ci];
+      var key = srcZone + '|||' + dstZone;
+      var cell = cells[key];
+      var isDiagonal = (srcZone === dstZone);
+
+      var cellBg = bgColor;
+      var cellText = '';
+
+      if (cell && cell.total > 0) {
+        var avgRisk = cell.avgRisk || 0;
+        if (!isDiagonal) {
+          if (avgRisk >= 7) cellBg = 'rgba(255,68,68,0.25)';
+          else if (avgRisk >= 4) cellBg = 'rgba(255,204,0,0.25)';
+          else cellBg = 'rgba(39,174,96,0.25)';
+        }
+        cellText = '<b>' + cell.total + '</b><br><span style="font-size:9px;">' +
+          '<span style="color:#27ae60;">\u2713' + cell.accept + '</span> ' +
+          '<span style="color:#e74c3c;">\u2717' + cell.deny + '</span></span>';
+      }
+
+      if (isDiagonal) {
+        cellBg = isDark ? '#1a1a2e' : '#f0f0f0';
+        cellText = '<span style="color:#999;font-size:10px;">intra-zone</span>';
+      }
+
+      var tooltip = '\u0418\u0437 ' + srcZone + ' \u0432 ' + dstZone;
+      if (cell && cell.total > 0) {
+        tooltip += '\n\u0412\u0441\u0435\u0433\u043e: ' + cell.total + ' | Accept: ' + cell.accept + ' | Deny: ' + cell.deny + ' | Avg Risk: ' + (cell.avgRisk || 0);
+        if (cell.ruleNames && cell.ruleNames.length > 0) {
+          tooltip += '\n\u041f\u0440\u0430\u0432\u0438\u043b\u0430: ' + cell.ruleNames.join(', ');
+        }
+      }
+
+      html += '<td style="border:1px solid ' + borderColor + ';padding:6px;text-align:center;' +
+        'cursor:pointer;background:' + cellBg + ';color:' + textColor + ';' +
+        'min-width:90px;transition:background 0.15s;' +
+        'font-family:Segoe UI,sans-serif;' +
+        '" onmouseover="this.style.filter=\'brightness(1.2)\';" onmouseout="this.style.filter=\'\';"' +
+        ' title="' + tooltip + '"' +
+        ' onclick="alert(\'' + tooltip.replace(/\\n/g, '\\n') + '\')">' +
+        cellText + '</td>';
+    }
+    html += '</tr>';
+  }
+  html += '</tbody></table>';
+  container.innerHTML = html;
 }
 
 function showNodeInfo(nodeId) {
@@ -2771,27 +2976,35 @@ function escapeHtml(s) {
 
 // ─── DASHBOARD ───────────────────────────────────────
 var dashboardCharts = {};
+var fullDashboardCharts = {};
 
 function loadDashboard() {
   if (STATIC_MODE) {
     if (__dashboardData && __dashboardData.kpis) {
-      renderDashboard(__dashboardData);
+      renderDashboard(__dashboardData, 'dashboard-content');
+      renderDashboard(__dashboardData, 'full-dashboard-content');
     }
     return;
   }
   fetch('/api/dashboard')
     .then(function(r) { return r.json(); })
     .then(function(data) {
-      renderDashboard(data);
+      renderDashboard(data, 'dashboard-content');
+      renderDashboard(data, 'full-dashboard-content');
     })
     .catch(function(e) {
       document.getElementById('dashboard-content').innerHTML =
         '<div class="item"><div class="label" style="color:#e94560;">Ошибка загрузки дашборда: ' + e + '</div></div>';
+      document.getElementById('full-dashboard-content').innerHTML =
+        '<div class="item"><div class="label" style="color:#e94560;">Ошибка загрузки дашборда: ' + e + '</div></div>';
     });
 }
 
-function renderDashboard(data) {
-  var container = document.getElementById('dashboard-content');
+function renderDashboard(data, targetId) {
+  targetId = targetId || 'dashboard-content';
+  var isFull = (targetId === 'full-dashboard-content');
+  var prefix = isFull ? 'full-' : '';
+  var container = document.getElementById(targetId);
   if (!data.kpis || !data.kpis.length) {
     container.innerHTML = '<div class="item"><div class="label">Нет данных для дашборда</div></div>';
     return;
@@ -2867,26 +3080,26 @@ function renderDashboard(data) {
   // ── Charts row 1: Score breakdown + Allow/Deny pie ──
   html += '<div class="chart-row">';
   if (data.security_score_breakdown) {
-    html += '<div class="chart-container chart-half"><h4>🛡️ Security Score Breakdown</h4><canvas id="chartScoreBreakdown"></canvas></div>';
+    html += '<div class="chart-container ' + (isFull ? 'chart-half' : '') + '"><h4>🛡️ Security Score Breakdown</h4><canvas id="' + prefix + 'chartScoreBreakdown"></canvas></div>';
   }
   if (data.allow_deny_breakdown) {
-    html += '<div class="chart-container chart-half"><h4>🚦 Allow / Deny</h4><canvas id="chartAllowDeny"></canvas></div>';
+    html += '<div class="chart-container ' + (isFull ? 'chart-half' : '') + '"><h4>🚦 Allow / Deny</h4><canvas id="' + prefix + 'chartAllowDeny"></canvas></div>';
   }
   html += '</div>';
 
   // ── Charts row 2: Rules Health + Severity bar ──
   html += '<div class="chart-row">';
   if (data.rules_health_breakdown) {
-    html += '<div class="chart-container chart-half"><h4>📋 Rules Health</h4><canvas id="chartRulesHealth"></canvas></div>';
+    html += '<div class="chart-container ' + (isFull ? 'chart-half' : '') + '"><h4>📋 Rules Health</h4><canvas id="' + prefix + 'chartRulesHealth"></canvas></div>';
   }
   if (data.severity_counts) {
-    html += '<div class="chart-container chart-half"><h4>🎯 Findings by Severity</h4><canvas id="chartSeverity"></canvas></div>';
+    html += '<div class="chart-container ' + (isFull ? 'chart-half' : '') + '"><h4>🎯 Findings by Severity</h4><canvas id="' + prefix + 'chartSeverity"></canvas></div>';
   }
   html += '</div>';
 
   // Trend chart
   if (data.trend_data && data.trend_data.length > 1) {
-    html += '<div class="chart-container"><h4>📈 Risk Trend</h4><canvas id="chartTrend"></canvas></div>';
+    html += '<div class="chart-container"><h4>📈 Risk Trend</h4><canvas id="' + prefix + 'chartTrend"></canvas></div>';
   }
 
   // Top Risks
@@ -2921,21 +3134,23 @@ function renderDashboard(data) {
 
   // Draw charts after DOM update
   setTimeout(function() {
-    drawDashboardCharts(data);
+    drawDashboardCharts(data, prefix, isFull);
   }, 100);
 }
 
-function drawDashboardCharts(data) {
+function drawDashboardCharts(data, prefix, isFull) {
+  prefix = prefix || '';
+  var charts = isFull ? fullDashboardCharts : dashboardCharts;
   // Destroy existing charts
-  Object.values(dashboardCharts).forEach(function(c) { c.destroy(); });
-  dashboardCharts = {};
+  Object.values(charts).forEach(function(c) { c.destroy(); });
+  var newCharts = {};
 
   // Score Breakdown — doughnut
-  var cb = document.getElementById('chartScoreBreakdown');
+  var cb = document.getElementById(prefix + 'chartScoreBreakdown');
   if (cb && data.security_score_breakdown) {
     var labels = Object.keys(data.security_score_breakdown);
     var values = Object.values(data.security_score_breakdown);
-    dashboardCharts.score = new Chart(cb, {
+    newCharts.score = new Chart(cb, {
       type: 'doughnut',
       data: { labels: labels, datasets: [{ data: values, backgroundColor: ['#3b82f6','#10b981','#f59e0b','#e94560','#8b5cf6'] }] },
       options: { responsive: true, maintainAspectRatio: true, plugins: { legend: { position: 'bottom', labels: { font: { size: 10 }, color: '#a0a0a0' } } } }
@@ -2943,11 +3158,11 @@ function drawDashboardCharts(data) {
   }
 
   // Allow/Deny — pie
-  var ad = document.getElementById('chartAllowDeny');
+  var ad = document.getElementById(prefix + 'chartAllowDeny');
   if (ad && data.allow_deny_breakdown) {
     var adLabels = Object.keys(data.allow_deny_breakdown);
     var adValues = Object.values(data.allow_deny_breakdown);
-    dashboardCharts.allowDeny = new Chart(ad, {
+    newCharts.allowDeny = new Chart(ad, {
       type: 'pie',
       data: { labels: adLabels, datasets: [{ data: adValues, backgroundColor: ['#10b981','#e94560','#6b7280'] }] },
       options: { responsive: true, maintainAspectRatio: true, plugins: { legend: { position: 'bottom', labels: { font: { size: 10 }, color: '#a0a0a0' } } } }
@@ -2955,11 +3170,11 @@ function drawDashboardCharts(data) {
   }
 
   // Rules Health — bar
-  var rh = document.getElementById('chartRulesHealth');
+  var rh = document.getElementById(prefix + 'chartRulesHealth');
   if (rh && data.rules_health_breakdown) {
     var labels2 = Object.keys(data.rules_health_breakdown);
     var values2 = Object.values(data.rules_health_breakdown);
-    dashboardCharts.rules = new Chart(rh, {
+    newCharts.rules = new Chart(rh, {
       type: 'bar',
       data: { labels: labels2, datasets: [{ data: values2, backgroundColor: ['#f59e0b','#e94560','#3b82f6','#6b7280','#10b981'] }] },
       options: { responsive: true, maintainAspectRatio: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
@@ -2967,11 +3182,11 @@ function drawDashboardCharts(data) {
   }
 
   // Severity counts — bar
-  var sev = document.getElementById('chartSeverity');
+  var sev = document.getElementById(prefix + 'chartSeverity');
   if (sev && data.severity_counts) {
     var sevLabels = Object.keys(data.severity_counts);
     var sevValues = Object.values(data.severity_counts);
-    dashboardCharts.severity = new Chart(sev, {
+    newCharts.severity = new Chart(sev, {
       type: 'bar',
       data: { labels: sevLabels, datasets: [{ data: sevValues, backgroundColor: ['#e94560','#f59e0b','#3b82f6','#10b981'] }] },
       options: { responsive: true, maintainAspectRatio: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } } }
@@ -2979,21 +3194,36 @@ function drawDashboardCharts(data) {
   }
 
   // Trend — line
-  var tr = document.getElementById('chartTrend');
+  var tr = document.getElementById(prefix + 'chartTrend');
   if (tr && data.trend_data && data.trend_data.length > 1) {
     var tlabels = data.trend_data.map(function(d) { return d.timestamp ? d.timestamp.substring(0, 10) : ''; });
     var tvalues = data.trend_data.map(function(d) { return d.risk_score || 0; });
-    dashboardCharts.trend = new Chart(tr, {
+    newCharts.trend = new Chart(tr, {
       type: 'line',
       data: { labels: tlabels, datasets: [{ data: tvalues, borderColor: '#e94560', backgroundColor: 'rgba(233,69,96,0.1)', fill: true, tension: 0.3 }] },
       options: { responsive: true, maintainAspectRatio: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
     });
   }
-  // After dashboard charts, also load extra visualizations
-  setTimeout(function() {
-    loadRiskDonut();
-    loadServiceTable();
-  }, 200);
+
+  // Assign back to the correct chart store
+  if (isFull) {
+    fullDashboardCharts = newCharts;
+  } else {
+    dashboardCharts = newCharts;
+  }
+  // After dashboard charts, also load extra visualizations for sidebar only
+  if (!isFull) {
+    setTimeout(function() {
+      loadRiskDonut();
+      loadServiceTable();
+    }, 200);
+  } else {
+    // Load full-dashboard versions of risk donut and service table
+    setTimeout(function() {
+      loadFullRiskDonut();
+      loadFullServiceTable();
+    }, 200);
+  }
 }
 
 // ─── RISK DONUT (Canvas 2D) ─────────────────────────
@@ -3016,9 +3246,24 @@ function showTopology(mode) {
   document.getElementById('btn-3d').classList.remove('active');
 
   if (STATIC_MODE) {
-    var container = document.getElementById('tab-info');
-    container.innerHTML = '<div class="item"><div class="label">Топологии доступны в веб-режиме (python main.py configs/ --web)</div></div>';
-    switchTab('tab-info');
+    var topoDataMap = {
+      'data-flow': __topoDataFlow,
+      'trust-boundary': __topoTrustBoundary,
+      'resilience': __topoResilience,
+      'encryption': __topoEncryption,
+      'lateral-movement': __topoLateralMovement,
+      'microseg': __topoMicroseg,
+      'vrf': __topoVrf,
+    };
+    var data = topoDataMap[mode];
+    if (data && data.nodes && data.edges) {
+      applyTopologyData(mode, data);
+      renderTopologySummary(mode, data);
+    } else {
+      var container = document.getElementById('tab-info');
+      container.innerHTML = '<div class="item"><div class="label">Топология недоступна в статическом режиме</div></div>';
+      switchTab('tab-info');
+    }
     return;
   }
 
@@ -3233,6 +3478,16 @@ function renderTopologySummary(mode, data) {
 // ─── A1 OPTIMIZER ─────────────────────────────────────
 function renderOptimizer() {
   var container = document.getElementById('optimizer-content');
+
+  if (STATIC_MODE) {
+    if (__optimizerData && (__optimizerData.score || __optimizerData.preview)) {
+      _renderOptimizerContent(__optimizerData, container);
+    } else {
+      container.innerHTML = '<div class="item"><div class="label">Оптимизатор недоступен в статическом режиме</div></div>';
+    }
+    return;
+  }
+
   container.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text2);">⚙️ Анализ оптимизации правил...</div>';
 
   fetch('/api/optimize/preview', {
@@ -3242,10 +3497,18 @@ function renderOptimizer() {
   })
   .then(function(r) { return r.json(); })
   .then(function(data) {
-    var score = data.score || {};
-    var preview = data.preview || {};
-    var original = preview.original_rules || [];
-    var consolidated = preview.consolidated_rules || [];
+    _renderOptimizerContent(data, container);
+  })
+  .catch(function(e) {
+    container.innerHTML = '<div class="item"><div class="label" style="color:#e94560;">Ошибка загрузки оптимизации: ' + e + '</div></div>';
+  });
+}
+
+function _renderOptimizerContent(data, container) {
+  var score = data.score || {};
+  var preview = data.preview || {};
+  var original = preview.original_rules || [];
+  var consolidated = preview.consolidated_rules || [];
     var groupings = preview.groupings || [];
 
     var savingsClass = score.savings_count >= 10 ? '#10b981' : score.savings_count >= 3 ? '#f59e0b' : 'var(--text2)';
@@ -3299,17 +3562,17 @@ function renderOptimizer() {
     _lastOptimizationResult = data;
 
     container.innerHTML = html;
-  })
-  .catch(function(e) {
-    container.innerHTML = '<div class="item"><div class="label" style="color:#e94560;">Ошибка загрузки оптимизации: ' + e + '</div></div>';
-  });
-}
+} // end _renderOptimizerContent
 
 var _lastOptimizationResult = null;
 
 // ─── A2b WHAT-IF UI ─────────────────────────────────
 function renderWhatIf() {
   var resultDiv = document.getElementById('whatif-result');
+  if (STATIC_MODE) {
+    resultDiv.innerHTML = '<div class="item"><div class="label">What-If анализ недоступен в статическом режиме — требуется активный сервер</div></div>';
+    return;
+  }
   resultDiv.innerHTML = '<div style="text-align:center;padding:10px;color:var(--text2);">⏳ Симуляция...</div>';
 
   var changeType = document.getElementById('whatif-type').value;
@@ -3383,6 +3646,13 @@ function renderWhatIf() {
 }
 
 function exportOptimizationResult() {
+  if (STATIC_MODE) {
+    // In static mode, use preloaded data if available
+    if (__optimizerData && (__optimizerData.score || __optimizerData.preview)) {
+      doExport(__optimizerData);
+    }
+    return;
+  }
   if (!_lastOptimizationResult) {
     // Re-fetch
     fetch('/api/optimize/preview', {
@@ -3410,6 +3680,11 @@ function doExport(data) {
 // ─── A2 IMPACT ANALYSIS ───────────────────────────────
 function analyzeImpact(nodeId) {
   var container = document.getElementById('tab-info');
+  if (STATIC_MODE) {
+    container.innerHTML = '<div class="item"><div class="label">Impact Analysis недоступен в статическом режиме — требуется активный сервер</div></div>';
+    switchTab('tab-info');
+    return;
+  }
   container.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text2);">💥 Анализ влияния для ' + escapeHtml(nodeId) + '...</div>';
 
   // Switch to info tab
@@ -3502,6 +3777,7 @@ function analyzeImpact(nodeId) {
 }
 
 function showImpactReport(nodeId) {
+  if (STATIC_MODE) return;
   fetch('/api/impact/report?type=node&id=' + encodeURIComponent(nodeId))
     .then(function(r) { return r.json(); })
     .then(function(data) {
@@ -3564,10 +3840,13 @@ function resetTopology() {
   renderMinimap();
 }
 
-// Reset topology when switching to standard modes
+// Reset topology when switching AWAY from a special topology mode
+// (e.g., after showTopology data-flow/trust-boundary/etc.)
 var origSetMode = setMode;
 setMode = function(mode) {
-  resetTopology();
+  if (currentTopo) {
+    resetTopology();
+  }
   origSetMode(mode);
 };
 
@@ -3576,6 +3855,141 @@ renderSidebar = function() {
   loadDashboard();
   origRenderSidebar();
 };
+
+// ─── FULL-DASHBOARD RISK DONUT ──────────────────────
+function loadFullRiskDonut() {
+  if (STATIC_MODE) {
+    if (__riskSeverityData && __riskSeverityData.length) {
+      drawRiskDonutTo(__riskSeverityData, 'full-risk-donut', 'full-donut-legend');
+    }
+    return;
+  }
+  fetch('/api/risk-severity')
+    .then(function(r) { return r.json(); })
+    .then(function(data) { drawRiskDonutTo(data, 'full-risk-donut', 'full-donut-legend'); })
+    .catch(function(e) {
+      document.getElementById('full-risk-donut-container').innerHTML =
+        '<h4>🎯 Risk Severity</h4><div class="label" style="color:#e94560;">Ошибка загрузки: ' + e + '</div>';
+    });
+}
+
+function drawRiskDonutTo(data, canvasId, legendId) {
+  if (!data || !data.length) {
+    var container = document.getElementById(canvasId).parentElement;
+    container.innerHTML = '<h4>🎯 Risk Severity</h4><div class="label">Нет данных</div>';
+    return;
+  }
+  var canvas = document.getElementById(canvasId);
+  if (!canvas) return;
+
+  var container = canvas.parentElement;
+  var w = container.clientWidth - 20;
+  var h = Math.min(w, 250);
+  canvas.width = w * (window.devicePixelRatio || 1);
+  canvas.height = h * (window.devicePixelRatio || 1);
+  canvas.style.width = w + 'px';
+  canvas.style.height = h + 'px';
+
+  var ctx = canvas.getContext('2d');
+  var dpr = window.devicePixelRatio || 1;
+  ctx.scale(dpr, dpr);
+
+  var cx = w / 2, cy = h / 2;
+  var outerR = Math.min(cx, cy) - 10;
+  var innerR = outerR * 0.55;
+
+  var total = data.reduce(function(s, d) { return s + d.count; }, 0);
+  var startAngle = -Math.PI / 2;
+
+  data.forEach(function(d) {
+    var sliceAngle = (d.count / total) * 2 * Math.PI;
+    ctx.beginPath();
+    ctx.moveTo(cx + innerR * Math.cos(startAngle), cy + innerR * Math.sin(startAngle));
+    ctx.arc(cx, cy, outerR, startAngle, startAngle + sliceAngle);
+    ctx.arc(cx, cy, innerR, startAngle + sliceAngle, startAngle, true);
+    ctx.closePath();
+    ctx.fillStyle = d.color || '#666';
+    ctx.fill();
+
+    var midAngle = startAngle + sliceAngle / 2;
+    var labelR = outerR * 0.78;
+    var lx = cx + labelR * Math.cos(midAngle);
+    var ly = cy + labelR * Math.sin(midAngle);
+    if (d.percentage > 0) {
+      ctx.fillStyle = '#fff';
+      ctx.font = 'bold 10px "Segoe UI", system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      var pctText = Math.round(d.percentage) + '%';
+      ctx.fillText(pctText, lx, ly);
+    }
+
+    startAngle += sliceAngle;
+  });
+
+  ctx.fillStyle = getComputedStyle(document.body).getPropertyValue('--text').trim() || '#e0e0e0';
+  ctx.font = 'bold 14px "Segoe UI", system-ui, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(total, cx, cy - 6);
+  ctx.font = '10px "Segoe UI", system-ui, sans-serif';
+  ctx.fillStyle = getComputedStyle(document.body).getPropertyValue('--text2').trim() || '#a0a0a0';
+  ctx.fillText('Total', cx, cy + 10);
+
+  var legendEl = document.getElementById(legendId);
+  if (legendEl) {
+    var legendHtml = '';
+    data.forEach(function(d) {
+      legendHtml += '<span class="dl-item"><span class="dl-swatch" style="background:' + d.color + ';"></span>' + escapeHtml(d.severity) + ' (' + d.count + ')</span>';
+    });
+    legendEl.innerHTML = legendHtml;
+  }
+}
+
+// ─── FULL-DASHBOARD SERVICE TABLE ────────────────────
+function loadFullServiceTable() {
+  if (STATIC_MODE) {
+    if (__servicesData && __servicesData.length) {
+      renderServiceTableTo(__servicesData, 'full-service-table');
+    }
+    return;
+  }
+  fetch('/api/services')
+    .then(function(r) { return r.json(); })
+    .then(function(data) { renderServiceTableTo(data, 'full-service-table'); })
+    .catch(function(e) {
+      document.getElementById('full-service-table').innerHTML =
+        '<div class="label" style="color:#e94560;">Ошибка загрузки: ' + e + '</div>';
+    });
+}
+
+function renderServiceTableTo(data, containerId) {
+  var container = document.getElementById(containerId);
+  if (!container) return;
+  if (!data || !data.length) {
+    container.innerHTML = '<div class="label">Нет данных о сервисах</div>';
+    return;
+  }
+
+  var sorted = data.slice().sort(function(a, b) { return b.count - a.count; }).slice(0, 15);
+  var maxCount = sorted.length ? sorted[0].count : 1;
+
+  var html = '<table class="svc-table">';
+  html += '<thead><tr><th>Название</th><th>Кол-во</th><th>Протокол</th><th>%</th><th></th></tr></thead>';
+  html += '<tbody>';
+  sorted.forEach(function(s) {
+    var barW = Math.round((s.count / maxCount) * 100);
+    html += '<tr>';
+    html += '<td><b>' + escapeHtml(s.name || '?') + '</b></td>';
+    html += '<td>' + s.count + '</td>';
+    html += '<td>' + escapeHtml(s.protocol || 'any') + '</td>';
+    html += '<td>' + (s.percentage ? s.percentage.toFixed(1) + '%' : '-') + '</td>';
+    html += '<td class="bar-cell"><div class="bar-bg"><div class="bar-fill" style="width:' + barW + '%"></div></div></td>';
+    html += '</tr>';
+  });
+  html += '</tbody></table>';
+  container.innerHTML = html;
+}
 
 // ─── RISK DONUT (Canvas 2D) ─────────────────────────
 
@@ -3722,6 +4136,21 @@ function renderServiceTable(data) {
 // ─── SANKEY DIAGRAM (Canvas 2D) ──────────────────────
 
 function loadSankey() {
+  if (STATIC_MODE) {
+    if (__sankeyData && __sankeyData.nodes && __sankeyData.nodes.length > 0) {
+      renderSankey(__sankeyData);
+    } else {
+      var canvas = document.getElementById('sankey-canvas');
+      if (canvas) {
+        var ctx = canvas.getContext('2d');
+        ctx.fillStyle = getComputedStyle(document.body).getPropertyValue('--text2').trim() || '#a0a0a0';
+        ctx.font = '12px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('Sankey недоступен в статическом режиме', canvas.width / 2, canvas.height / 2);
+      }
+    }
+    return;
+  }
   fetch('/api/sankey')
     .then(function(r) { return r.json(); })
     .then(function(data) { renderSankey(data); })
@@ -3912,6 +4341,21 @@ function renderSankey(data) {
 // ─── HILBERT IP MAP (Canvas 2D) ──────────────────────
 
 function loadHilbert() {
+  if (STATIC_MODE) {
+    if (__hilbertData && __hilbertData.points && __hilbertData.points.length > 0) {
+      renderHilbert(__hilbertData);
+    } else {
+      var canvas = document.getElementById('hilbert-canvas');
+      if (canvas) {
+        var ctx = canvas.getContext('2d');
+        ctx.fillStyle = getComputedStyle(document.body).getPropertyValue('--text2').trim() || '#a0a0a0';
+        ctx.font = '12px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('Hilbert Map недоступен в статическом режиме', canvas.width / 2, canvas.height / 2);
+      }
+    }
+    return;
+  }
   fetch('/api/hilbert')
     .then(function(r) { return r.json(); })
     .then(function(data) { renderHilbert(data); })

@@ -140,7 +140,7 @@ class ObjectResolver:
                 # Пробуем как IP или CIDR
                 result = self._resolve_as_ip(obj_id)
         
-        elif obj_type in ['zone', 'network']:
+        elif obj_type in ['zone', 'network', 'subnet', 'host', 'group', 'unknown']:
             if obj_id in self._zones:
                 result = self._resolve_zone(obj_id)
             elif obj_id in self._network_groups:
