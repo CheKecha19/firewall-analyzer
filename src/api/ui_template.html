@@ -1169,41 +1169,72 @@ function initNetwork() {
     renderMinimap();
   });
 
-  // ── Unified drag tracking (replaces fragile mouseup/mouseleave hacks) ──
-  var _networkDragActive = false;
-  var _lastDragType = null; // 'node' | 'canvas'
+  // ── Drag handling ──
+  // vis.js dragStart/dragEnd only fire for node dragging, NOT for canvas panning (dragView).
+  // This is the root cause of the "canvas sticks to cursor" bug:
+  // vis.js's internal dragView state doesn't get cleaned up when mouseup happens
+  // outside the canvas or during rapid interactions.
+  //
+  // Solution: track mousedown on the network container to detect panning start,
+  // and use document-level mouseup to inject a synthetic MouseEvent into the
+  // vis.js canvas — forcing vis.js to finalize its internal drag state.
 
-  network.on('dragStart', function(params) {
-    _networkDragActive = true;
-    _lastDragType = params.nodes.length > 0 ? 'node' : 'canvas';
-    network.setOptions({ physics: { enabled: false } });
+  var _panningActive = false;
+  var container = document.getElementById('mynetwork');
+
+  // Detect when vis.js canvas-level panning starts (mousedown on empty space)
+  container.addEventListener('mousedown', function(e) {
+    // Let vis.js process the event first, then check if a node was NOT the target
+    setTimeout(function() {
+      var sel = network.getSelection();
+      // If no node is selected/grabbed, this is a canvas pan
+      if (sel.nodes.length === 0) {
+        _panningActive = true;
+      }
+    }, 0);
   });
 
+  // vis.js dragStart: node dragging (physics off)
+  network.on('dragStart', function(params) {
+    if (params.nodes.length > 0) {
+      _panningActive = false; // node drag supersedes panning
+      network.setOptions({ physics: { enabled: false } });
+    }
+  });
+
+  // vis.js dragEnd: node dragging finished (physics on for stabilization)
   network.on('dragEnd', function(params) {
-    _networkDragActive = false;
-    if (_lastDragType === 'node') {
+    if (params.nodes.length > 0) {
       network.setOptions({ physics: { enabled: true, stabilization: { iterations: 50 } } });
       setTimeout(function() {
         network.setOptions({ physics: { enabled: false } });
         renderMinimap();
       }, 1000);
-    } else {
-      renderMinimap();
     }
   });
 
-  // Single window-level mouseup: only act when a drag was actually in progress.
-  // This prevents spurious setOptions on every toolbar click / mouseleave.
-  window.addEventListener('mouseup', function(e) {
-    if (!_networkDragActive || !network) return;
-    _networkDragActive = false;
+  // The real fix: document-level mouseup — inject a synthetic event into vis.js canvas
+  // to force vis.js to clean up its internal dragView state
+  document.addEventListener('mouseup', function(e) {
+    if (!_panningActive || !network) return;
+    _panningActive = false;
 
-    if (_lastDragType === 'canvas') {
-      // Panning: just freeze physics, redraw minimap
-      network.setOptions({ physics: { enabled: false } });
-      renderMinimap();
+    // Find the vis.js canvas element and dispatch a synthetic mouseup
+    var canvas = container.querySelector('canvas');
+    if (canvas) {
+      var syntheticEvent = new MouseEvent('mouseup', {
+        bubbles: true,
+        cancelable: true,
+        clientX: e.clientX,
+        clientY: e.clientY,
+        button: 0
+      });
+      canvas.dispatchEvent(syntheticEvent);
     }
-    // For 'node' drag we let vis.js dragEnd handle the stabilisation sequence.
+
+    // Ensure physics is off after panning
+    network.setOptions({ physics: { enabled: false } });
+    renderMinimap();
   });
 
   network.on('zoom', function() { renderMinimap(); });
@@ -1223,19 +1254,27 @@ function setMode(mode) {
   updateHash();
   if (!network) return;
 
+  // Reset to default node colors/sizes before applying mode-specific styling
+  _resetNodeAppearance();
+
   var physics, layout;
   switch (mode) {
     case 'standard':
       physics = { enabled: true, solver: 'barnesHut', barnesHut: { gravitationalConstant: -2000, springLength: 150 }, stabilization: { iterations: 100 } };
       layout = { hierarchical: false };
       break;
+
     case 'hierarchy':
       physics = { enabled: true, solver: 'hierarchicalRepulsion', stabilization: { iterations: 100 } };
       layout = { hierarchical: { enabled: true, direction: 'UD', sortMethod: 'directed', nodeSpacing: 150, levelSeparation: 200 } };
+      // Color nodes by zone/group for visual differentiation
+      _colorNodesByZone();
       break;
+
     case 'circle':
       physics = { enabled: false };
       layout = { hierarchical: false };
+      _colorNodesByZone();
       // Manual circular layout
       var nodeIds = allNodes.map(function(n) { return n.id; });
       var cx = 0, cy = 0, r = Math.max(300, nodeIds.length * 15);
@@ -1248,7 +1287,6 @@ function setMode(mode) {
       network.moveTo({ position: { x: 0, y: 0 }, scale: 1 });
       setTimeout(function() {
         network.storePositions();
-        // Actually set positions via data update
         var nodes = network.body.data.nodes.get();
         nodes.forEach(function(n) {
           if (positions[n.id]) {
@@ -1258,13 +1296,19 @@ function setMode(mode) {
       }, 100);
       renderMinimap();
       return;
+
     case 'risk':
       physics = { enabled: true, solver: 'barnesHut', barnesHut: { gravitationalConstant: -3000, springLength: 100, centralGravity: 1 } };
       layout = { hierarchical: false };
+      // Color nodes and edges by risk score
+      _colorNodesByRisk();
+      _colorEdgesByRisk();
       break;
+
     case 'attack':
       renderAttackGraph();
       return;
+
     default:
       physics = { enabled: true };
       layout = { hierarchical: false };
@@ -1274,6 +1318,102 @@ function setMode(mode) {
     network.stabilize(100);
     renderMinimap();
   }, 200);
+}
+
+// ── Mode helpers: visual styling ──
+function _resetNodeAppearance() {
+  var nodeUpdates = allNodes.map(function(n) {
+    return {
+      id: n.id,
+      color: n.color || getColorForZone(n.group || 'Unknown'),
+      size: n.size || 25,
+      borderWidth: 1
+    };
+  });
+  network.body.data.nodes.update(nodeUpdates);
+
+  // Reset edges to default
+  var edgeUpdates = allEdges.map(function(e, idx) {
+    return {
+      id: e.id || String(idx),
+      color: e.color || '#666',
+      width: e.width || 1
+    };
+  });
+  network.body.data.edges.update(edgeUpdates);
+}
+
+function _colorNodesByZone() {
+  var updates = [];
+  allNodes.forEach(function(n) {
+    var zoneColor = getColorForZone(n.group || 'Unknown');
+    updates.push({
+      id: n.id,
+      color: { background: zoneColor, border: _darken(zoneColor, 0.2) },
+      borderWidth: 2
+    });
+  });
+  network.body.data.nodes.update(updates);
+}
+
+function _colorNodesByRisk() {
+  var updates = [];
+  // Aggregate risk per node from connected edges
+  var nodeRisk = {};
+  allEdges.forEach(function(e) {
+    nodeRisk[e.from] = Math.max(nodeRisk[e.from] || 0, e.risk || 0);
+    nodeRisk[e.to] = Math.max(nodeRisk[e.to] || 0, e.risk || 0);
+  });
+
+  allNodes.forEach(function(n) {
+    var risk = nodeRisk[n.id] || 0;
+    var bg, border;
+    if (risk >= 9)      { bg = '#ff0000'; border = '#cc0000'; }
+    else if (risk >= 7) { bg = '#ff6600'; border = '#cc4400'; }
+    else if (risk >= 5) { bg = '#ffcc00'; border = '#cc9900'; }
+    else if (risk >= 3) { bg = '#99cc00'; border = '#669900'; }
+    else               { bg = '#339933'; border = '#226622'; }
+
+    updates.push({
+      id: n.id,
+      color: { background: bg, border: border },
+      size: 22 + risk * 2,
+      borderWidth: 2
+    });
+  });
+  network.body.data.nodes.update(updates);
+}
+
+function _colorEdgesByRisk() {
+  var updates = [];
+  allEdges.forEach(function(e, idx) {
+    var risk = e.risk || 0;
+    var color;
+    if (risk >= 9)      color = '#ff0000';
+    else if (risk >= 7) color = '#ff6600';
+    else if (risk >= 5) color = '#ffcc00';
+    else if (risk >= 3) color = '#99cc00';
+    else               color = '#339933';
+
+    updates.push({
+      id: e.id || String(idx),
+      color: color,
+      width: 1 + risk * 0.5
+    });
+  });
+  network.body.data.edges.update(updates);
+}
+
+// Simple color darken helper
+function _darken(hex, amount) {
+  if (!hex || hex.length < 7) return '#333';
+  var r = parseInt(hex.slice(1,3), 16);
+  var g = parseInt(hex.slice(3,5), 16);
+  var b = parseInt(hex.slice(5,7), 16);
+  r = Math.floor(r * (1 - amount));
+  g = Math.floor(g * (1 - amount));
+  b = Math.floor(b * (1 - amount));
+  return '#' + r.toString(16).padStart(2,'0') + g.toString(16).padStart(2,'0') + b.toString(16).padStart(2,'0');
 }
 
 function updateHash() {
